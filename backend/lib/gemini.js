@@ -42,20 +42,24 @@ export const getGeminiResponse = async (systemPrompt, userPrompt) => {
   }
 };
 
+import { pipeline } from '@xenova/transformers';
+
+let embedder = null;
+
 /**
- * Simple embedding wrapper using text-embedding-004
+ * Local Embedding using BAAI/bge-base-en-v1.5 (768 dimensions)
  */
 export const getEmbedding = async (text) => {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-embedding-2" });
-    const result = await model.embedContent({
-      content: { parts: [{ text }] },
-      taskType: "RETRIEVAL_DOCUMENT",
-      outputDimensionality: 768
-    });
-    return result.embedding.values;
+    if (!embedder) {
+      console.log("Loading local embedding model (BAAI/bge-base-en-v1.5)... This only happens once.");
+      embedder = await pipeline('feature-extraction', 'Xenova/bge-base-en-v1.5');
+    }
+
+    const output = await embedder(text, { pooling: 'mean', normalize: true });
+    return Array.from(output.data);
   } catch (error) {
-    console.error('Embedding Error:', error);
+    console.error('Local Embedding Error:', error);
     throw error;
   }
 };

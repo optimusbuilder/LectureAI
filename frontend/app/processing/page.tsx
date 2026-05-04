@@ -64,17 +64,20 @@ export default function ProcessingPage() {
           if (currentStepId) {
             setSteps((prev) => {
               const currentIndex = prev.findIndex(s => s.id === currentStepId)
-              return prev.map((step, idx) => {
-                if (idx < currentIndex) return { ...step, status: "complete" }
-                if (idx === currentIndex) return { ...step, status: "active" }
-                return { ...step, status: "pending" }
+              const newSteps = prev.map((step, idx) => {
+                if (idx < currentIndex) return { ...step, status: "complete" as const }
+                if (idx === currentIndex) return { ...step, status: "active" as const }
+                return { ...step, status: "pending" as const }
               })
+              
+              // Correctly calculate progress based on the index
+              setProgress(25 + (currentIndex * 25))
+              return newSteps
             })
-            setProgress(25 + (prev.findIndex(s => s.id === currentStepId) * 25))
           }
         } else if (job.status === "complete") {
           setProgress(100)
-          setSteps((prev) => prev.map(s => ({ ...step, status: "complete" })))
+          setSteps((prev) => prev.map(s => ({ ...s, status: "complete" as const })))
           setIsComplete(true)
           setVideoTitle(job.videoMeta?.title)
         } else if (job.status === "error") {

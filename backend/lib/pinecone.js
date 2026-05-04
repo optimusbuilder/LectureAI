@@ -18,9 +18,10 @@ const index = pc.index(process.env.PINECONE_INDEX_NAME || 'lecture-ai');
 export const upsertChunks = async (videoId, chunks) => {
   console.log(`Indexing ${chunks.length} chunks for video ${videoId}...`);
   
-  const vectors = await Promise.all(chunks.map(async (chunk) => {
+  const vectors = [];
+  for (const chunk of chunks) {
     const values = await getEmbedding(chunk.text);
-    return {
+    vectors.push({
       id: `${videoId}_${chunk.id}`,
       values,
       metadata: {
@@ -29,8 +30,10 @@ export const upsertChunks = async (videoId, chunks) => {
         startTime: chunk.startTime,
         endTime: chunk.endTime
       }
-    };
-  }));
+    });
+    // Tiny delay to be safe with free tier rate limits
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
 
   // Batch upsert (max 100 per call recommended)
   for (let i = 0; i < vectors.length; i += 100) {

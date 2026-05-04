@@ -24,6 +24,7 @@ import {
   BookOpen,
   Layers,
   Globe,
+  Loader2,
 } from "lucide-react"
 
 // Mock data for the lecture outline
