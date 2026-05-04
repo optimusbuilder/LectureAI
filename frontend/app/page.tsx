@@ -5,18 +5,25 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { GraduationCap, Presentation, Loader2, Sparkles } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { startJob } from "@/lib/api"
 
 export default function LandingPage() {
   const [url, setUrl] = useState("")
   const [mode, setMode] = useState("student")
   const [isLoading, setIsLoading] = useState(false)
 
+  const router = useRouter()
   const handleAnalyze = async () => {
     if (!url.trim()) return
     setIsLoading(true)
-    // Simulate analysis - replace with actual API call
-    await new Promise((resolve) => setTimeout(resolve, 2000))
-    setIsLoading(false)
+    try {
+      const { jobId } = await startJob(url, mode as 'student' | 'faculty')
+      router.push(`/processing?jobId=${jobId}`)
+    } catch (error: any) {
+      alert(error.message || 'Failed to start analysis')
+      setIsLoading(false)
+    }
   }
 
   return (

@@ -211,114 +211,44 @@ function TimelineSuggestion({
   );
 }
 
-// Sample data
-const auditData = {
-  videoTitle: "Introduction to Thermodynamics",
-  channel: "MIT OpenCourseWare",
-  overallScore: 72,
-  criticalImprovement: {
-    timestamp: "12:34",
-    title: "Complex Concept Without Visual Aid",
-    description:
-      "The explanation of entropy at this point relies heavily on verbal description without accompanying diagrams or animations, making it difficult for visual learners to grasp.",
-    suggestedAction:
-      "Add a simple diagram showing molecular disorder, or use an animation to demonstrate entropy increase in real-time.",
-  },
-  categories: [
-    {
-      title: "Clarity",
-      icon: Eye,
-      score: 78,
-      findings: [
-        "Technical jargon introduced without prior definition",
-        "Strong use of analogies for abstract concepts",
-        "Some sentences exceed 30 words, reducing comprehension",
-      ],
-      recommendations: [
-        "Define terms like 'adiabatic' before first use",
-        "Break complex sentences into shorter segments",
-        "Add verbal signposts between topic transitions",
-      ],
-    },
-    {
-      title: "Accessibility",
-      icon: Users,
-      score: 65,
-      findings: [
-        "No captions or transcript provided",
-        "Color contrast in slides meets WCAG AA",
-        "Speaking pace averages 165 WPM (slightly fast)",
-      ],
-      recommendations: [
-        "Generate and review auto-captions for accuracy",
-        "Slow pace to 140-150 WPM during complex sections",
-        "Provide downloadable transcript with timestamps",
-      ],
-    },
-    {
-      title: "Equity",
-      icon: Users,
-      score: 68,
-      findings: [
-        "Examples drawn primarily from Western contexts",
-        "Gender-neutral language used consistently",
-        "Limited representation in example scenarios",
-      ],
-      recommendations: [
-        "Include examples from diverse cultural contexts",
-        "Feature contributions from underrepresented scientists",
-        "Vary scenario settings and character backgrounds",
-      ],
-    },
-    {
-      title: "Pacing",
-      icon: Gauge,
-      score: 82,
-      findings: [
-        "Good use of pauses after key concepts",
-        "Recap provided at 15-minute intervals",
-        "Final 5 minutes feel rushed compared to start",
-      ],
-      recommendations: [
-        "Extend final summary by 2-3 minutes",
-        "Add micro-breaks for note-taking after equations",
-        "Consider splitting into two shorter segments",
-      ],
-    },
-  ],
-  timelineSuggestions: [
-    {
-      timestamp: "3:22",
-      currentMoment:
-        "So basically, thermodynamics is, um, the study of heat and energy transfer and stuff like that.",
-      suggestedRewrite:
-        "Thermodynamics is the branch of physics that studies how heat and energy move between systems. Let me break this down with a simple example.",
-    },
-    {
-      timestamp: "8:15",
-      currentMoment:
-        "The first law is conservation of energy, which you probably learned in high school, right?",
-      suggestedRewrite:
-        "The first law of thermodynamics states that energy cannot be created or destroyed—only transformed. Whether or not you've encountered this before, let's explore what it means in practice.",
-    },
-    {
-      timestamp: "15:47",
-      currentMoment:
-        "Entropy always increases. That's just how it works. Moving on...",
-      suggestedRewrite:
-        "Entropy, or disorder, naturally increases in isolated systems over time. This is a profound concept—let's pause here and consider why this matters before we continue.",
-    },
-    {
-      timestamp: "22:03",
-      currentMoment:
-        "The Carnot cycle is the most efficient theoretical engine cycle and it goes like this...",
-      suggestedRewrite:
-        "The Carnot cycle represents the theoretical maximum efficiency any heat engine can achieve. I'll walk through each of its four stages, explaining why this ideal matters for real-world engineering.",
-    },
-  ],
-};
+import { useParams } from "next/navigation"
+import { pollJob } from "@/lib/api"
+import { useEffect } from "react"
 
 export default function AuditPage() {
+  const params = useParams()
+  const jobId = params.jobId as string
+  const [data, setData] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    if (!jobId) return
+    const fetchData = async () => {
+      try {
+        const job = await pollJob(jobId)
+        if (job.status === "complete") {
+          setData(job)
+        }
+      } catch (err) {
+        console.error(err)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchData()
+  }, [jobId])
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = Math.floor(seconds % 60)
+    return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  if (isLoading) return <div className="min-h-screen flex items-center justify-center">Analyzing pedagogy...</div>
+  if (!data) return <div className="min-h-screen flex items-center justify-center">Audit report not found.</div>
+
+  const { result, videoMeta } = data
+  const { overallScore, topPriority, dimensions, timestampedSuggestions } = result
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -347,12 +277,12 @@ export default function AuditPage() {
               Faculty Mode
             </Badge>
             <h1 className="text-2xl font-bold text-foreground mb-1">
-              {auditData.videoTitle}
+              {videoMeta.title}
             </h1>
-            <p className="text-muted-foreground">{auditData.channel}</p>
+            <p className="text-muted-foreground">{videoMeta.author}</p>
           </div>
           <div className="flex flex-col items-center">
-            <ScoreGauge score={auditData.overallScore} />
+            <ScoreGauge score={overallScore} />
             <span className="text-sm font-medium text-muted-foreground mt-2">
               Overall Quality Score
             </span>
@@ -371,20 +301,22 @@ export default function AuditPage() {
                   <CardTitle className="text-lg text-amber-900">
                     Critical Improvement
                   </CardTitle>
-                  <Badge className="bg-amber-200 text-amber-800 border-amber-300">
-                    <Clock className="h-3 w-3 mr-1" />
-                    {auditData.criticalImprovement.timestamp}
-                  </Badge>
+                  {topPriority.timestamp && (
+                    <Badge className="bg-amber-200 text-amber-800 border-amber-300">
+                      <Clock className="h-3 w-3 mr-1" />
+                      {formatTime(topPriority.timestamp)}
+                    </Badge>
+                  )}
                 </div>
                 <CardDescription className="text-amber-800">
-                  {auditData.criticalImprovement.title}
+                  Priority Action
                 </CardDescription>
               </div>
             </div>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-amber-900 mb-4 leading-relaxed">
-              {auditData.criticalImprovement.description}
+              {topPriority.issue}
             </p>
             <div className="rounded-lg bg-amber-100/80 border border-amber-200 p-4">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-amber-700 mb-2 flex items-center gap-1.5">
@@ -392,27 +324,27 @@ export default function AuditPage() {
                 Suggested Action
               </h4>
               <p className="text-sm text-amber-900 leading-relaxed">
-                {auditData.criticalImprovement.suggestedAction}
+                {topPriority.suggestion}
               </p>
-            </div>
-            <div className="mt-4 flex gap-2">
-              <Button size="sm" className="gap-1.5 bg-amber-600 hover:bg-amber-700 text-white">
-                <Play className="h-3.5 w-3.5" />
-                Jump to {auditData.criticalImprovement.timestamp}
-              </Button>
-              <Button size="sm" variant="outline" className="gap-1.5 border-amber-300 text-amber-800 hover:bg-amber-100">
-                <ArrowRight className="h-3.5 w-3.5" />
-                Mark as Addressed
-              </Button>
             </div>
           </CardContent>
         </Card>
 
-        {/* 2x2 Grid of Audit Categories */}
+        {/* Grid of Audit Categories */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-          {auditData.categories.map((category) => (
-            <AuditCard key={category.title} {...category} />
-          ))}
+          {dimensions.map((category: any) => {
+            const icons: Record<string, any> = { Clarity: Eye, Accessibility: Users, Equity: Users, Pacing: Gauge };
+            return (
+              <AuditCard 
+                key={category.name} 
+                title={category.name}
+                icon={icons[category.name] || Sparkles}
+                score={category.score}
+                findings={category.findings}
+                recommendations={category.suggestions}
+              />
+            );
+          })}
         </div>
 
         {/* Timestamped Suggestions Timeline */}
@@ -427,11 +359,13 @@ export default function AuditPage() {
           </div>
 
           <div className="pl-2">
-            {auditData.timelineSuggestions.map((suggestion, index) => (
+            {timestampedSuggestions.map((suggestion: any, index: number) => (
               <TimelineSuggestion
-                key={suggestion.timestamp}
-                {...suggestion}
-                isLast={index === auditData.timelineSuggestions.length - 1}
+                key={index}
+                timestamp={formatTime(suggestion.timestamp)}
+                currentMoment={suggestion.issue}
+                suggestedRewrite={suggestion.rewrite}
+                isLast={index === timestampedSuggestions.length - 1}
               />
             ))}
           </div>

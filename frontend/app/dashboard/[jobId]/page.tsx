@@ -142,28 +142,67 @@ The lecture concludes with modern applications:
 - Climate science and atmospheric thermodynamics`,
 }
 
+import { useSearchParams, useParams } from "next/navigation"
+import { pollJob, searchLecture } from "@/lib/api"
+import { useEffect } from "react"
+
 export default function StudentDashboard() {
+  const params = useParams()
+  const jobId = params.jobId as string
+  const [data, setData] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const [language, setLanguage] = useState("en")
-  const [activeChapter, setActiveChapter] = useState(1)
-  const [summaryDepth, setSummaryDepth] = useState<"90-sec" | "5-min" | "full">("5-min")
+  const [summaryDepth, setSummaryDepth] = useState<"short" | "medium" | "full">("medium")
   const [currentFlashcard, setCurrentFlashcard] = useState(0)
   const [isFlipped, setIsFlipped] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
-  const [searchResults, setSearchResults] = useState(searchResultsData)
+  const [searchResults, setSearchResults] = useState<any[]>([])
+  const [isSearching, setIsSearching] = useState(false)
 
-  const handleSearch = (query: string) => {
+  useEffect(() => {
+    if (!jobId) return
+    const fetchData = async () => {
+      try {
+        const job = await pollJob(jobId)
+        if (job.status === "complete") {
+          setData(job)
+          setLanguage(job.result.language || "en")
+        }
+      } catch (err) {
+        console.error(err)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchData()
+  }, [jobId])
+
+  const handleSearch = async (query: string) => {
     setSearchQuery(query)
-    if (query.trim()) {
-      // Simulated search - in production this would call an API
-      setSearchResults(
-        searchResultsData.filter((result) =>
-          result.snippet.toLowerCase().includes(query.toLowerCase())
-        )
-      )
-    } else {
-      setSearchResults(searchResultsData)
+    if (query.trim().length > 2) {
+      setIsSearching(true)
+      try {
+        const { results } = await searchLecture(query, data.videoMeta.videoId)
+        setSearchResults(results)
+      } catch (err) {
+        console.error(err)
+      } finally {
+        setIsSearching(false)
+      }
     }
   }
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = Math.floor(seconds % 60)
+    return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  if (isLoading) return <div className="min-h-screen flex items-center justify-center">Loading your study materials...</div>
+  if (!data) return <div className="min-h-screen flex items-center justify-center">Data not found.</div>
+
+  const { result, videoMeta } = data
+  const { outline, summaries, flashcards } = result
 
   const nextFlashcard = () => {
     setIsFlipped(false)
@@ -191,12 +230,12 @@ export default function StudentDashboard() {
           {/* Video Info */}
           <div className="space-y-1">
             <h2 className="font-semibold text-sidebar-foreground leading-tight">
-              Introduction to Thermodynamics
+              {videoMeta.title}
             </h2>
-            <p className="text-sm text-muted-foreground">MIT OpenCourseWare</p>
+            <p className="text-sm text-muted-foreground">{videoMeta.author}</p>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Clock className="size-3" />
-              <span>1:00:00</span>
+              <span>{formatTime(videoMeta.duration)}</span>
             </div>
           </div>
         </div>
@@ -233,30 +272,24 @@ export default function StudentDashboard() {
           </div>
           <ScrollArea className="flex-1 px-2">
             <div className="space-y-1 pb-4">
-              {outlineData.map((chapter) => (
-                <button
-                  key={chapter.id}
-                  onClick={() => setActiveChapter(chapter.id)}
-                  className={`w-full text-left px-3 py-2.5 rounded-lg transition-colors group ${
-                    activeChapter === chapter.id
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                      : "hover:bg-sidebar-accent/50 text-sidebar-foreground"
-                  }`}
+              {outline.map((chapter: any, idx: number) => (
+                <a
+                  key={idx}
+                  href={chapter.youtubeLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full text-left px-3 py-2.5 rounded-lg transition-colors group hover:bg-sidebar-accent/50 text-sidebar-foreground block"
                 >
                   <div className="flex items-start gap-3">
                     <Badge
                       variant="outline"
-                      className={`text-xs font-mono shrink-0 ${
-                        activeChapter === chapter.id
-                          ? "border-sidebar-primary text-sidebar-primary"
-                          : "border-border text-muted-foreground"
-                      }`}
+                      className="text-xs font-mono shrink-0 border-border text-muted-foreground"
                     >
-                      {chapter.timestamp}
+                      {formatTime(chapter.timestamp)}
                     </Badge>
                     <span className="text-sm leading-tight">{chapter.title}</span>
                   </div>
-                </button>
+                </a>
               ))}
             </div>
           </ScrollArea>
@@ -302,7 +335,7 @@ export default function StudentDashboard() {
                 <div className="flex items-center gap-2 mb-6">
                   <span className="text-sm text-muted-foreground">Depth:</span>
                   <div className="flex gap-2">
-                    {(["90-sec", "5-min", "full"] as const).map((depth) => (
+                    {(["short", "medium", "full"] as const).map((depth) => (
                       <Button
                         key={depth}
                         variant={summaryDepth === depth ? "default" : "outline"}
@@ -310,7 +343,7 @@ export default function StudentDashboard() {
                         onClick={() => setSummaryDepth(depth)}
                         className="text-xs"
                       >
-                        {depth === "90-sec" ? "90-sec" : depth === "5-min" ? "5-min" : "Full"}
+                        {depth.toUpperCase()}
                       </Button>
                     ))}
                   </div>
@@ -319,7 +352,7 @@ export default function StudentDashboard() {
                 {/* Summary Content */}
                 <div className="prose prose-neutral max-w-none">
                   <div className="text-foreground whitespace-pre-wrap leading-relaxed">
-                    {summaryContent[summaryDepth]}
+                    {summaries[summaryDepth]}
                   </div>
                 </div>
               </div>
@@ -344,23 +377,24 @@ export default function StudentDashboard() {
                       <Badge variant="secondary" className="text-xs">
                         {isFlipped ? "Answer" : "Question"}
                       </Badge>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                        }}
+                      <a
+                        href={flashcards[currentFlashcard].youtubeLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
                         className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
                       >
                         <Play className="size-3" />
-                        <span>Jump to {flashcardsData[currentFlashcard].timestamp}</span>
-                      </button>
+                        <span>Jump to {formatTime(flashcards[currentFlashcard].timestamp)}</span>
+                      </a>
                     </div>
 
                     {/* Card Content */}
-                    <div className="flex-1 flex items-center justify-center">
+                    <div className="flex-1 flex items-center justify-center overflow-auto">
                       <p className="text-lg text-center leading-relaxed text-balance">
                         {isFlipped
-                          ? flashcardsData[currentFlashcard].answer
-                          : flashcardsData[currentFlashcard].question}
+                          ? flashcards[currentFlashcard].back
+                          : flashcards[currentFlashcard].front}
                       </p>
                     </div>
 
@@ -406,27 +440,44 @@ export default function StudentDashboard() {
 
                 {/* Search Results */}
                 <div className="space-y-3">
-                  {searchResults.length > 0 ? (
-                    searchResults.map((result) => (
-                      <Card key={result.id} className="p-4 hover:bg-accent/50 transition-colors cursor-pointer">
-                        <div className="flex items-start justify-between gap-4">
-                          <p className="text-sm text-foreground leading-relaxed flex-1">
-                            {result.snippet}
-                          </p>
-                          <Badge
-                            variant="outline"
-                            className="shrink-0 font-mono text-xs gap-1"
-                          >
-                            <Play className="size-3" />
-                            {result.timestamp}
-                          </Badge>
-                        </div>
-                      </Card>
+                  {isSearching ? (
+                    <div className="text-center py-12">
+                      <Loader2 className="size-8 animate-spin mx-auto mb-3 text-muted-foreground" />
+                      <p className="text-muted-foreground">Scanning lecture for answers...</p>
+                    </div>
+                  ) : searchResults.length > 0 ? (
+                    searchResults.map((result: any, idx: number) => (
+                      <a 
+                        key={idx} 
+                        href={result.youtubeLink} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="block"
+                      >
+                        <Card className="p-4 hover:bg-accent/50 transition-colors cursor-pointer">
+                          <div className="flex items-start justify-between gap-4">
+                            <p className="text-sm text-foreground leading-relaxed flex-1">
+                              {result.text}
+                            </p>
+                            <Badge
+                              variant="outline"
+                              className="shrink-0 font-mono text-xs gap-1"
+                            >
+                              <Play className="size-3" />
+                              {formatTime(result.startTime)}
+                            </Badge>
+                          </div>
+                        </Card>
+                      </a>
                     ))
-                  ) : (
+                  ) : searchQuery.trim().length > 2 ? (
                     <div className="text-center py-12">
                       <Search className="size-12 text-muted-foreground/40 mx-auto mb-3" />
                       <p className="text-muted-foreground">No results found for your search.</p>
+                    </div>
+                  ) : (
+                    <div className="text-center py-12 text-muted-foreground text-sm">
+                      Enter a question to start searching.
                     </div>
                   )}
                 </div>

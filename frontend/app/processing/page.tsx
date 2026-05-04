@@ -5,6 +5,8 @@ import { Processing } from "@/components/processing"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, RotateCcw } from "lucide-react"
 import Link from "next/link"
+import { useSearchParams, useRouter } from "next/navigation"
+import { pollJob } from "@/lib/api"
 
 type StepStatus = "complete" | "active" | "pending"
 
@@ -34,75 +36,73 @@ export default function ProcessingPage() {
     setIsComplete(false)
   }
 
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const jobId = searchParams.get("jobId")
+  const [error, setError] = useState<string | null>(null)
+
   useEffect(() => {
-    if (isComplete) return
+    if (!jobId || isComplete || error) return
 
-    // Simulate video title loading
-    const titleTimer = setTimeout(() => {
-      setVideoTitle("Introduction to Thermodynamics")
-    }, 1500)
+    const poll = async () => {
+      try {
+        const job = await pollJob(jobId)
+        
+        if (job.status === "processing") {
+          setVideoTitle(job.videoMeta?.title || "Analyzing Lecture...")
+          
+          // Map backend steps to frontend steps
+          const stepMap: Record<string, string> = {
+            "Extracting transcript...": "transcript",
+            "Analyzing lecture content...": "analyze",
+            "Building your study materials...": "materials",
+            "Generating faculty report...": "materials",
+            "Indexing for semantic search...": "index"
+          }
 
-    // Step 1: Extracting transcript (0-25%)
-    const step1Timer = setTimeout(() => {
-      setProgress(25)
-      setSteps((prev) =>
-        prev.map((step) =>
-          step.id === "transcript"
-            ? { ...step, status: "complete" }
-            : step.id === "analyze"
-              ? { ...step, status: "active" }
-              : step
-        )
-      )
-    }, 3000)
-
-    // Step 2: Analyzing lecture content (25-50%)
-    const step2Timer = setTimeout(() => {
-      setProgress(50)
-      setSteps((prev) =>
-        prev.map((step) =>
-          step.id === "analyze"
-            ? { ...step, status: "complete" }
-            : step.id === "materials"
-              ? { ...step, status: "active" }
-              : step
-        )
-      )
-    }, 6000)
-
-    // Step 3: Building study materials (50-75%)
-    const step3Timer = setTimeout(() => {
-      setProgress(75)
-      setSteps((prev) =>
-        prev.map((step) =>
-          step.id === "materials"
-            ? { ...step, status: "complete" }
-            : step.id === "index"
-              ? { ...step, status: "active" }
-              : step
-        )
-      )
-    }, 9000)
-
-    // Step 4: Indexing for semantic search (75-100%)
-    const step4Timer = setTimeout(() => {
-      setProgress(100)
-      setSteps((prev) =>
-        prev.map((step) =>
-          step.id === "index" ? { ...step, status: "complete" } : step
-        )
-      )
-      setIsComplete(true)
-    }, 12000)
-
-    return () => {
-      clearTimeout(titleTimer)
-      clearTimeout(step1Timer)
-      clearTimeout(step2Timer)
-      clearTimeout(step3Timer)
-      clearTimeout(step4Timer)
+          const currentStepId = stepMap[job.step]
+          if (currentStepId) {
+            setSteps((prev) => {
+              const currentIndex = prev.findIndex(s => s.id === currentStepId)
+              return prev.map((step, idx) => {
+                if (idx < currentIndex) return { ...step, status: "complete" }
+                if (idx === currentIndex) return { ...step, status: "active" }
+                return { ...step, status: "pending" }
+              })
+            })
+            setProgress(25 + (prev.findIndex(s => s.id === currentStepId) * 25))
+          }
+        } else if (job.status === "complete") {
+          setProgress(100)
+          setSteps((prev) => prev.map(s => ({ ...step, status: "complete" })))
+          setIsComplete(true)
+          setVideoTitle(job.videoMeta?.title)
+        } else if (job.status === "error") {
+          setError(job.message || "An error occurred")
+        }
+      } catch (err) {
+        console.error("Polling error:", err)
+      }
     }
-  }, [isComplete])
+
+    const interval = setInterval(poll, 2000)
+    poll() // Initial call
+
+    return () => clearInterval(interval)
+  }, [jobId, isComplete, error])
+
+  const handleViewResults = async () => {
+    try {
+      const job = await pollJob(jobId!)
+      if (job.mode === "faculty") {
+        router.push(`/audit/${jobId}`)
+      } else {
+        router.push(`/dashboard/${jobId}`)
+      }
+    } catch (err) {
+      console.error(err)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -150,7 +150,14 @@ export default function ProcessingPage() {
 
           {isComplete && (
             <div className="flex justify-center">
-              <Button className="gap-2">View Study Materials</Button>
+              <Button onClick={handleViewResults} className="gap-2">
+                View {steps[2].label === "Generating faculty report" ? "Faculty Report" : "Study Materials"}
+              </Button>
+            </div>
+          )}
+          {error && (
+            <div className="p-4 bg-destructive/10 text-destructive rounded-lg text-sm text-center">
+              {error}
             </div>
           )}
         </div>
