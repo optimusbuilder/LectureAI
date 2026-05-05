@@ -1,9 +1,9 @@
-import { YoutubeTranscript } from 'youtube-transcript';
+import { Innertube } from 'youtubei.js';
+
+const youtube = await Innertube.create();
 
 /**
  * Extracts Video ID from various YouTube URL formats
- * @param {string} url 
- * @returns {string|null}
  */
 export const extractVideoId = (url) => {
   const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i;
@@ -12,29 +12,8 @@ export const extractVideoId = (url) => {
 };
 
 /**
- * Fetches video metadata using YouTube oEmbed (no API key required)
- * @param {string} url 
- * @returns {Promise<Object>}
- */
-export const fetchMetadata = async (url) => {
-  try {
-    const response = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`);
-    if (!response.ok) throw new Error('METADATA_FETCH_FAILED');
-    const data = await response.json();
-    return {
-      title: data.title,
-      author: data.author_name,
-      thumbnail: data.thumbnail_url
-    };
-  } catch (error) {
-    console.error('Metadata fetch error:', error);
-    return { title: 'Unknown Lecture', author: 'Unknown', thumbnail: null };
-  }
-};
-
-/**
  * Ingestion Agent
- * Responsibility: Extract transcript and metadata from YouTube URL
+ * Responsibility: Extract transcript and metadata from YouTube URL using Innertube
  */
 export const ingestionAgent = async (youtubeUrl) => {
   const videoId = extractVideoId(youtubeUrl);
@@ -44,48 +23,49 @@ export const ingestionAgent = async (youtubeUrl) => {
   }
 
   try {
-    // 1. Fetch metadata and transcript in parallel
-    const [metadata, transcriptSegments] = await Promise.all([
-      fetchMetadata(youtubeUrl),
-      YoutubeTranscript.fetchTranscript(videoId)
-    ]);
+    console.log(`Fetching metadata and transcript for ${videoId} using Innertube...`);
+    
+    // 1. Get info and transcript
+    const info = await youtube.getInfo(videoId);
+    const transcriptData = await info.getTranscript();
 
-    // 2. Format the full transcript for the Intelligence Agent
+    if (!transcriptData || !transcriptData.sections) {
+      throw new Error('NO_CAPTIONS');
+    }
+
+    // 2. Format transcript segments
+    const transcriptSegments = [];
+    transcriptData.sections.forEach(section => {
+      section.snippets.forEach(snippet => {
+        transcriptSegments.push({
+          text: snippet.text,
+          start: Math.floor(snippet.start_ms / 1000),
+          duration: Math.floor(snippet.duration_ms / 1000)
+        });
+      });
+    });
+
+    // 3. Format the full transcript for the Intelligence Agent
     const fullTranscript = transcriptSegments
-      .map(segment => `[${Math.floor(segment.offset / 1000)}] ${segment.text}`)
+      .map(segment => `[${segment.start}] ${segment.text}`)
       .join(' ');
-
-    // 3. Calculate total duration (approximate from last segment)
-    const lastSegment = transcriptSegments[transcriptSegments.length - 1];
-    const duration = lastSegment ? Math.floor((lastSegment.offset + lastSegment.duration) / 1000) : 0;
 
     return {
       videoId,
-      title: metadata.title,
-      author: metadata.author,
-      thumbnail: metadata.thumbnail,
-      duration,
-      transcriptSegments: transcriptSegments.map(s => ({
-        text: s.text,
-        start: Math.floor(s.offset / 1000),
-        duration: Math.floor(s.duration / 1000)
-      })),
+      title: info.basic_info.title,
+      author: info.basic_info.author,
+      thumbnail: info.basic_info.thumbnail?.[0]?.url,
+      duration: info.basic_info.duration,
+      transcriptSegments,
       fullTranscript,
       error: null
     };
 
   } catch (error) {
-    console.error('Ingestion Agent Error:', error);
+    console.error('Ingestion Agent Error (Innertube):', error);
     
-    // Categorize common errors
-    if (error.message.includes('Could not find transcript')) {
+    if (error.message === 'NO_CAPTIONS' || error.message.includes('Transcript not available')) {
       return { error: 'NO_CAPTIONS' };
-    }
-    if (error.message.includes('private')) {
-      return { error: 'PRIVATE_VIDEO' };
-    }
-    if (error.message.includes('live') || error.message.includes('livestream') || error.message.includes('Live')) {
-      return { error: 'LIVESTREAM' };
     }
     
     return { error: 'TRANSCRIPT_ERROR', message: error.message };
