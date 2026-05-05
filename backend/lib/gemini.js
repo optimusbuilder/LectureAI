@@ -29,19 +29,34 @@ export const getGeminiResponse = async (systemPrompt, userPrompt, isJson = true)
 
     if (!isJson) return text;
 
-    // Secondary cleanup for JSON
-    if (text.startsWith('```')) {
-      text = text.replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
-    }
+    // Secondary cleanup for JSON: extract everything between the first { or [ and the last } or ]
+    if (isJson) {
+      const firstCurly = text.indexOf('{');
+      const firstSquare = text.indexOf('[');
+      const lastCurly = text.lastIndexOf('}');
+      const lastSquare = text.lastIndexOf(']');
 
-    try {
-      return JSON.parse(text);
-    } catch (parseError) {
-      import('fs').then(fs => {
-        fs.writeFileSync('debug_gemini_output.json', text);
-      });
-      console.error('JSON Parse Error. Raw output saved to debug_gemini_output.json');
-      throw new Error('FAILED_TO_PARSE_GEMINI_JSON');
+      let startIndex = -1;
+      let endIndex = -1;
+
+      if (firstCurly !== -1 && (firstSquare === -1 || firstCurly < firstSquare)) {
+        startIndex = firstCurly;
+        endIndex = lastCurly;
+      } else if (firstSquare !== -1) {
+        startIndex = firstSquare;
+        endIndex = lastSquare;
+      }
+
+      if (startIndex !== -1 && endIndex !== -1 && endIndex >= startIndex) {
+        text = text.substring(startIndex, endIndex + 1);
+      }
+      
+      try {
+        return JSON.parse(text);
+      } catch (parseError) {
+        console.error('JSON Parse Error. Raw output:', text);
+        throw new Error('FAILED_TO_PARSE_GEMINI_JSON');
+      }
     }
   } catch (error) {
     console.error('Gemini API Error:', error);
