@@ -1,6 +1,10 @@
 import { Innertube } from 'youtubei.js';
 
-const youtube = await Innertube.create();
+// Initialize Innertube with a consistent location to avoid 400 Precondition errors on cloud IPs
+const youtube = await Innertube.create({
+  location: 'US',
+  lang: 'en'
+});
 
 /**
  * Extracts Video ID from various YouTube URL formats

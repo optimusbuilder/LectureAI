@@ -12,6 +12,9 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Required for express-rate-limit to work behind Railway's proxy
+app.set('trust proxy', 1);
+
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
@@ -22,9 +25,11 @@ const allowedOrigins = [
 
 const corsOptions = {
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
+    // Allow if no origin (local tools), matches allowed list, or is a Vercel subdomain
+    if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
       callback(null, true);
     } else {
+      console.log('Blocked by CORS:', origin);
       callback(new Error('CORS Policy Error'));
     }
   },
