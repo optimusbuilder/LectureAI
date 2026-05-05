@@ -85,12 +85,23 @@ async function processLecture(jobId, url, mode) {
 
     // Step 4: Indexing for Search (last step)
     updateJob(jobId, { step: 'Indexing for semantic search...' });
-    await upsertChunks(ingestionData.videoId, intelligenceData.chunks);
+    let searchAvailable = true;
+    try {
+      await upsertChunks(ingestionData.videoId, intelligenceData.chunks);
+    } catch (indexError) {
+      console.error(`Search indexing failed for job ${jobId}:`, indexError);
+      searchAvailable = false;
+      updateJob(jobId, {
+        searchIndexError: indexError.message,
+        searchAvailable: false
+      });
+    }
 
     // Completion
     updateJob(jobId, { 
       status: 'complete', 
       result,
+      searchAvailable,
       videoMeta: {
         title: ingestionData.title,
         videoId: ingestionData.videoId,

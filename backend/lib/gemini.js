@@ -4,6 +4,8 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const GEMINI_EMBEDDING_MODEL = process.env.GEMINI_EMBEDDING_MODEL || 'gemini-embedding-001';
+const GEMINI_EMBEDDING_DIMENSIONS = 768;
 
 const JSON_PARSE_PREVIEW_CHARS = 700;
 
@@ -105,14 +107,49 @@ ${text}
 };
 
 /**
- * API Embedding using Google Gemini text-embedding-004 (768 dimensions)
- * Switched from local BAAI to prevent Railway memory limits from choking.
+ * API embedding using Gemini's current REST embedding endpoint.
+ * Keeps output at 768 dimensions to match the existing Pinecone index.
  */
-export const getEmbedding = async (text) => {
+export const getEmbedding = async (text, taskType = 'RETRIEVAL_DOCUMENT') => {
   try {
-    const embeddingModel = genAI.getGenerativeModel({ model: "text-embedding-004" });
-    const result = await embeddingModel.embedContent(text);
-    return result.embedding.values;
+    const modelName = GEMINI_EMBEDDING_MODEL.replace(/^models\//, '');
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:embedContent`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': process.env.GEMINI_API_KEY
+      },
+      body: JSON.stringify({
+        taskType,
+        output_dimensionality: GEMINI_EMBEDDING_DIMENSIONS,
+        content: {
+          parts: [{ text }]
+        }
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('Gemini Embedding API Error:', {
+        status: response.status,
+        statusText: response.statusText,
+        model: modelName,
+        error: data.error
+      });
+      throw new Error('GEMINI_EMBEDDING_FAILED');
+    }
+
+    const values = data.embedding?.values || data.embeddings?.[0]?.values;
+    if (!Array.isArray(values)) {
+      console.error('Gemini Embedding API returned an unexpected response:', {
+        model: modelName,
+        keys: Object.keys(data)
+      });
+      throw new Error('GEMINI_EMBEDDING_INVALID_RESPONSE');
+    }
+
+    return values;
   } catch (error) {
     console.error('Gemini Embedding Error:', error);
     throw error;

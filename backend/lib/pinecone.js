@@ -40,7 +40,7 @@ export const upsertChunks = async (videoId, chunks) => {
   const vectors = [];
   
   for (const chunk of chunks) {
-    const values = await getEmbedding(chunk.text);
+    const values = await getEmbedding(chunk.text, 'RETRIEVAL_DOCUMENT');
     vectors.push({
       id: `${videoId}_${chunk.id}`,
       values,
@@ -71,7 +71,7 @@ export const upsertChunks = async (videoId, chunks) => {
  * @param {number} topK 
  */
 export const searchChunks = async (videoId, query, topK = 3) => {
-  const queryVector = await getEmbedding(query);
+  const queryVector = await getEmbedding(query, 'RETRIEVAL_QUERY');
   const ns = index.namespace(videoId);
   
   const queryResponse = await ns.query({
