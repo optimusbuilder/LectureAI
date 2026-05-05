@@ -13,12 +13,13 @@ export const getGeminiResponse = async (systemPrompt, userPrompt, isJson = true)
     const config = {
       model: "gemini-2.0-flash",
       systemInstruction: systemPrompt,
+      generationConfig: {
+        maxOutputTokens: 8192,
+      }
     };
 
     if (isJson) {
-      config.generationConfig = {
-        responseMimeType: "application/json",
-      };
+      config.generationConfig.responseMimeType = "application/json";
     }
 
     const model = genAI.getGenerativeModel(config);
