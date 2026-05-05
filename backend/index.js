@@ -4,6 +4,8 @@ import dotenv from 'dotenv';
 import processRouter from './routes/process.js';
 import statusRouter from './routes/status.js';
 import searchRouter from './routes/search.js';
+import regenerateRouter from './routes/regenerate.js';
+import ttsRouter from './routes/tts.js';
 
 dotenv.config();
 
@@ -41,6 +43,8 @@ app.get('/health', (req, res) => {
 app.use('/process', processRouter);
 app.use('/status', statusRouter);
 app.use('/search', searchRouter);
+app.use('/regenerate', regenerateRouter);
+app.use('/tts', ttsRouter);
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

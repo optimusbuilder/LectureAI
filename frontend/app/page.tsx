@@ -1,176 +1,192 @@
 "use client"
 
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import { GraduationCap, Presentation, Loader2, Sparkles } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { FoxMascot } from "@/components/fox-mascot"
 import { startJob } from "@/lib/api"
+import { FileText, Search, Layers, GraduationCap, Users, Sparkles } from "lucide-react"
 
 export default function LandingPage() {
-  const [url, setUrl] = useState("")
-  const [mode, setMode] = useState("student")
-  const [isLoading, setIsLoading] = useState(false)
-
   const router = useRouter()
-  const handleAnalyze = async () => {
+  const [url, setUrl] = useState("")
+  const [mode, setMode] = useState<"student" | "faculty">("student")
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
     if (!url.trim()) return
+    
     setIsLoading(true)
+    setError(null)
     try {
-      const { jobId } = await startJob(url, mode as 'student' | 'faculty')
+      const { jobId } = await startJob(url.trim(), mode)
       router.push(`/processing?jobId=${jobId}`)
-    } catch (error: any) {
-      alert(error.message || 'Failed to start analysis')
+    } catch (err: any) {
+      setError(err.message || 'Failed to start processing')
       setIsLoading(false)
     }
   }
 
+  const features = [
+    {
+      icon: FileText,
+      color: "bg-duo-green",
+      title: "Smart Summaries",
+      description: "Get concise summaries at 90 seconds, 5 minutes, or full depth."
+    },
+    {
+      icon: Layers,
+      color: "bg-duo-blue",
+      title: "Interactive Flashcards",
+      description: "Auto-generated flashcards with timestamps to jump back to the lecture."
+    },
+    {
+      icon: Search,
+      color: "bg-duo-orange",
+      title: "Semantic Search",
+      description: "Ask questions and find exact moments in the lecture instantly."
+    },
+    {
+      icon: GraduationCap,
+      color: "bg-duo-purple",
+      title: "Student Mode",
+      description: "Everything you need to master the material and ace your exams."
+    },
+    {
+      icon: Users,
+      color: "bg-duo-yellow text-duo-text",
+      title: "Faculty Mode",
+      description: "Pedagogical audits with clarity, accessibility, and pacing insights."
+    },
+    {
+      icon: Sparkles,
+      color: "bg-duo-green",
+      title: "AI-Powered",
+      description: "Advanced AI analyzes lectures in under 60 seconds."
+    }
+  ]
+
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      {/* Header */}
-      <header className="w-full border-b border-border">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Sparkles className="size-6 text-primary" />
-            <span className="text-xl font-bold tracking-tight text-foreground">
-              LectureAI
-            </span>
-          </div>
-          <nav className="hidden sm:flex items-center gap-6">
-            <a
-              href="#how-it-works"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              How it works
-            </a>
-          </nav>
+    <div className="min-h-screen bg-white">
+      {/* Navigation */}
+      <nav className="flex items-center justify-between px-6 py-4 max-w-6xl mx-auto">
+        <div className="flex items-center gap-2">
+          <FoxMascot size="sm" expression="happy" animate={false} />
+          <span className="text-duo-green font-extrabold text-xl">LectureAI</span>
         </div>
-      </header>
+        <a 
+          href="#features" 
+          className="text-duo-text font-bold hover:text-duo-green transition-colors"
+        >
+          Features
+        </a>
+      </nav>
 
       {/* Hero Section */}
-      <main className="flex-1 flex items-center justify-center px-6 py-16 md:py-24">
-        <div className="max-w-2xl w-full text-center space-y-10">
+      <main className="max-w-4xl mx-auto px-6 pt-12 pb-20">
+        <div className="flex flex-col items-center text-center">
+          {/* Fox Mascot */}
+          <FoxMascot size="xl" expression="happy" className="mb-8" />
+          
           {/* Headline */}
-          <div className="space-y-4">
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-foreground text-balance leading-tight">
-              Turn any lecture into a study environment
-            </h1>
-            <p className="text-lg md:text-xl text-muted-foreground max-w-xl mx-auto text-pretty">
-              Paste a YouTube lecture URL to generate personalized study
-              materials or a pedagogical audit.
-            </p>
-          </div>
+          <h1 className="text-5xl md:text-6xl font-black text-duo-text mb-4 text-balance">
+            Learn smarter, not harder
+          </h1>
+          
+          {/* Subheadline */}
+          <p className="text-xl text-duo-text-muted font-semibold mb-10 max-w-xl text-pretty">
+            Paste a YouTube lecture. Get a complete study environment in 60 seconds.
+          </p>
 
-          {/* Input Section */}
-          <div className="space-y-6">
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="w-full max-w-xl space-y-6">
             {/* URL Input */}
-            <div className="relative">
-              <Input
-                type="url"
-                placeholder="https://youtube.com/watch?v=..."
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                className="h-14 px-5 text-base md:text-lg rounded-xl border-2 border-input bg-background focus-visible:border-foreground focus-visible:ring-0 focus-visible:ring-offset-0 transition-colors"
-              />
-            </div>
+            <input
+              type="url"
+              placeholder="Paste YouTube lecture URL here..."
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              className="input-duo h-14 text-center text-lg"
+              required
+            />
 
             {/* Mode Toggle */}
-            <div className="flex flex-col items-center gap-3">
-              <span className="text-sm font-medium text-muted-foreground">
-                Select your mode
-              </span>
-              <ToggleGroup
-                type="single"
-                value={mode}
-                onValueChange={(value) => value && setMode(value)}
-                className="bg-muted p-1 rounded-lg"
+            <div className="flex justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => setMode("student")}
+                className={`flex items-center gap-2 px-6 py-3 rounded-full font-bold text-sm transition-all duration-100 ${
+                  mode === "student"
+                    ? "bg-duo-green text-white border-b-4 border-duo-green-dark"
+                    : "bg-white text-duo-text border-2 border-duo-border border-b-4"
+                }`}
               >
-                <ToggleGroupItem
-                  value="student"
-                  aria-label="Student Mode"
-                  className="data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm px-4 py-2 rounded-md gap-2 text-muted-foreground transition-all"
-                >
-                  <GraduationCap className="size-4" />
-                  <span className="font-medium">Student Mode</span>
-                </ToggleGroupItem>
-                <ToggleGroupItem
-                  value="faculty"
-                  aria-label="Faculty Mode"
-                  className="data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-sm px-4 py-2 rounded-md gap-2 text-muted-foreground transition-all"
-                >
-                  <Presentation className="size-4" />
-                  <span className="font-medium">Faculty Mode</span>
-                </ToggleGroupItem>
-              </ToggleGroup>
+                <GraduationCap className="w-5 h-5" />
+                Student
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("faculty")}
+                className={`flex items-center gap-2 px-6 py-3 rounded-full font-bold text-sm transition-all duration-100 ${
+                  mode === "faculty"
+                    ? "bg-duo-purple text-white border-b-4 border-duo-purple-dark"
+                    : "bg-white text-duo-text border-2 border-duo-border border-b-4"
+                }`}
+              >
+                <Users className="w-5 h-5" />
+                Faculty
+              </button>
             </div>
 
-            {/* CTA Button */}
-            <Button
-              onClick={handleAnalyze}
+            {/* Submit Button */}
+            <button
+              type="submit"
               disabled={isLoading || !url.trim()}
-              size="lg"
-              className="h-12 px-8 text-base font-semibold rounded-xl shadow-sm hover:shadow-md transition-all"
+              className="btn-3d-primary w-full text-base py-4 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading ? (
-                <>
-                  <Loader2 className="size-5 animate-spin" />
-                  <span>Analyzing...</span>
-                </>
-              ) : (
-                <span>Analyze Lecture</span>
-              )}
-            </Button>
-          </div>
+              {isLoading ? "Starting..." : "Analyze Lecture"}
+            </button>
 
-          {/* Mode Description */}
-          <div className="pt-4">
-            <p className="text-sm text-muted-foreground">
-              {mode === "student" ? (
-                <>
-                  <span className="font-medium text-foreground">
-                    Student Mode:
-                  </span>{" "}
-                  Generate flashcards, summaries, and practice questions from
-                  the lecture.
-                </>
-              ) : (
-                <>
-                  <span className="font-medium text-foreground">
-                    Faculty Mode:
-                  </span>{" "}
-                  Receive a pedagogical audit with teaching effectiveness
-                  insights.
-                </>
-              )}
-            </p>
-          </div>
+            {error && (
+              <div className="p-3 rounded-xl bg-red-50 border-2 border-red-200 text-center">
+                <p className="text-red-600 font-semibold text-sm">{error}</p>
+              </div>
+            )}
+          </form>
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="w-full border-t border-border">
-        <div className="max-w-5xl mx-auto px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-            <span>© 2024 LectureAI</span>
-          </div>
-          <div className="flex items-center gap-6">
-            <a
-              href="#how-it-works"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              How it works
-            </a>
-            <a
-              href="https://github.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              GitHub
-            </a>
+      {/* Features Section */}
+      <section id="features" className="bg-duo-surface py-20">
+        <div className="max-w-6xl mx-auto px-6">
+          <h2 className="text-3xl font-extrabold text-duo-text text-center mb-12">
+            Everything you need to master any lecture
+          </h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {features.map((feature, index) => (
+              <div
+                key={feature.title}
+                className="card-duo p-6 opacity-0 animate-fade-in-up"
+                style={{ animationDelay: `${index * 100}ms`, animationFillMode: "forwards" }}
+              >
+                <div className={`w-12 h-12 ${feature.color} rounded-full flex items-center justify-center mb-4`}>
+                  <feature.icon className="w-6 h-6 text-white" />
+                </div>
+                <h3 className="text-lg font-bold text-duo-text mb-2">{feature.title}</h3>
+                <p className="text-duo-text-muted font-semibold text-sm">{feature.description}</p>
+              </div>
+            ))}
           </div>
         </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="py-8 text-center">
+        <p className="text-duo-text-muted font-semibold text-sm">
+          Made with AI-powered magic
+        </p>
       </footer>
     </div>
   )

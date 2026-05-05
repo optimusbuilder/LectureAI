@@ -1,225 +1,76 @@
-"use client";
+"use client"
 
-import { useState } from "react";
-import Link from "next/link";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Sparkles,
-  AlertTriangle,
+import { useState, useEffect } from "react"
+import { useParams } from "next/navigation"
+import Link from "next/link"
+import { FoxMascot } from "@/components/fox-mascot"
+import { pollJob } from "@/lib/api"
+import { 
+  ArrowLeft, 
+  AlertTriangle, 
+  Eye, 
+  Users, 
+  Scale, 
   Clock,
   Lightbulb,
-  CheckCircle2,
-  ArrowRight,
   Play,
-  Eye,
-  Users,
-  Gauge,
-  ChevronLeft,
-} from "lucide-react";
+  Loader2,
+  AlertCircle
+} from "lucide-react"
 
-// Circular Score Gauge Component
-function ScoreGauge({ score, size = 140 }: { score: number; size?: number }) {
-  const strokeWidth = 10;
-  const radius = (size - strokeWidth) / 2;
-  const circumference = radius * 2 * Math.PI;
-  const offset = circumference - (score / 100) * circumference;
-
-  const getScoreColor = (score: number) => {
-    if (score >= 80) return "text-emerald-500";
-    if (score >= 60) return "text-amber-500";
-    return "text-red-500";
-  };
-
-  const getStrokeColor = (score: number) => {
-    if (score >= 80) return "#10b981";
-    if (score >= 60) return "#f59e0b";
-    return "#ef4444";
-  };
+function ScoreGauge({ score }: { score: number }) {
+  const circumference = 2 * Math.PI * 45
+  const strokeDashoffset = circumference - (score / 100) * circumference
+  
+  const getColor = (score: number) => {
+    if (score >= 70) return "#58CC02"
+    if (score >= 50) return "#FFC800"
+    return "#FF4B4B"
+  }
 
   return (
-    <div className="relative" style={{ width: size, height: size }}>
-      <svg className="transform -rotate-90" width={size} height={size}>
-        {/* Background circle */}
+    <div className="relative w-32 h-32">
+      <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="45" fill="none" stroke="#E5E5E5" strokeWidth="8" />
         <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={strokeWidth}
-          className="text-muted/40"
-        />
-        {/* Progress circle */}
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke={getStrokeColor(score)}
-          strokeWidth={strokeWidth}
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          strokeLinecap="round"
+          cx="50" cy="50" r="45" fill="none"
+          stroke={getColor(score)} strokeWidth="8" strokeLinecap="round"
+          strokeDasharray={circumference} strokeDashoffset={strokeDashoffset}
           className="transition-all duration-1000 ease-out"
         />
       </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className={`text-3xl font-bold ${getScoreColor(score)}`}>
-          {score}
-        </span>
-        <span className="text-xs text-muted-foreground">out of 100</span>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className="text-3xl font-black text-duo-text">{score}</span>
       </div>
     </div>
-  );
+  )
 }
 
-// Audit Category Card Component
-function AuditCard({
-  title,
-  icon: Icon,
-  score,
-  findings,
-  recommendations,
-}: {
-  title: string;
-  icon: React.ElementType;
-  score: number;
-  findings: string[];
-  recommendations: string[];
-}) {
-  const getScoreColor = (score: number) => {
-    if (score >= 80) return "bg-emerald-500";
-    if (score >= 60) return "bg-amber-500";
-    return "bg-red-500";
-  };
-
+function ProgressBar({ score, color }: { score: number; color: string }) {
   return (
-    <Card className="h-full">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
-              <Icon className="h-4 w-4 text-foreground" />
-            </div>
-            <CardTitle className="text-base">{title}</CardTitle>
-          </div>
-          <Badge variant="secondary" className="font-mono text-xs">
-            {score}/100
-          </Badge>
-        </div>
-        <Progress
-          value={score}
-          className={`h-1.5 mt-2 [&>[data-slot=progress-indicator]]:${getScoreColor(score)}`}
-        />
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div>
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-            Findings
-          </h4>
-          <ul className="space-y-1.5">
-            {findings.map((finding, i) => (
-              <li
-                key={i}
-                className="flex items-start gap-2 text-sm text-foreground"
-              >
-                <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-foreground/40 shrink-0" />
-                {finding}
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div className="rounded-lg bg-muted/50 p-3">
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-            Recommendations
-          </h4>
-          <ul className="space-y-1.5">
-            {recommendations.map((rec, i) => (
-              <li key={i} className="flex items-start gap-2 text-sm">
-                <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
-                <span className="text-foreground">{rec}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-// Timeline Suggestion Item
-function TimelineSuggestion({
-  timestamp,
-  currentMoment,
-  suggestedRewrite,
-  isLast,
-}: {
-  timestamp: string;
-  currentMoment: string;
-  suggestedRewrite: string;
-  isLast?: boolean;
-}) {
-  return (
-    <div className="flex gap-4">
-      {/* Timeline line and dot */}
-      <div className="flex flex-col items-center">
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-mono font-medium">
-          {timestamp}
-        </div>
-        {!isLast && <div className="w-px flex-1 bg-border mt-2" />}
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 pb-8">
-        <Card className="border-border/60">
-          <CardContent className="p-4 space-y-3">
-            <div>
-              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
-                Current Moment
-              </h4>
-              <p className="text-sm text-foreground leading-relaxed">
-                {currentMoment}
-              </p>
-            </div>
-            <div>
-              <h4 className="text-xs font-semibold uppercase tracking-wide text-emerald-600 mb-1.5 flex items-center gap-1.5">
-                <Lightbulb className="h-3.5 w-3.5" />
-                Suggested Rewrite
-              </h4>
-              <div className="rounded-md bg-emerald-50 border border-emerald-200 p-3 font-mono text-sm text-emerald-900 leading-relaxed">
-                {`"${suggestedRewrite}"`}
-              </div>
-            </div>
-            <Button variant="ghost" size="sm" className="h-7 text-xs gap-1.5">
-              <Play className="h-3 w-3" />
-              Jump to {timestamp}
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+    <div className="w-full h-3 rounded-full bg-duo-surface overflow-hidden">
+      <div 
+        className={`h-full rounded-full transition-all duration-500`}
+        style={{ width: `${score}%`, backgroundColor: color }}
+      />
     </div>
-  );
+  )
 }
 
-import { useParams } from "next/navigation"
-import { pollJob } from "@/lib/api"
-import { useEffect } from "react"
+const dimensionMeta: Record<string, { icon: any; color: string; hex: string }> = {
+  "Clarity": { icon: Eye, color: "duo-green", hex: "#58CC02" },
+  "Accessibility": { icon: Users, color: "duo-blue", hex: "#1CB0F6" },
+  "Equity": { icon: Scale, color: "duo-orange", hex: "#FF9600" },
+  "Pacing": { icon: Clock, color: "duo-purple", hex: "#CE82FF" },
+}
 
 export default function AuditPage() {
   const params = useParams()
   const jobId = params.jobId as string
+
   const [data, setData] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!jobId) return
@@ -228,9 +79,12 @@ export default function AuditPage() {
         const job = await pollJob(jobId)
         if (job.status === "complete") {
           setData(job)
+        } else if (job.status === "error") {
+          setError(job.message || "Failed to load audit")
         }
       } catch (err) {
         console.error(err)
+        setError("Failed to connect to server")
       } finally {
         setIsLoading(false)
       }
@@ -241,171 +95,175 @@ export default function AuditPage() {
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
     const secs = Math.floor(seconds % 60)
-    return `${mins}:${secs.toString().padStart(2, '0')}`
+    return `${mins}:${secs.toString().padStart(2, "0")}`
   }
 
-  if (isLoading) return <div className="min-h-screen flex items-center justify-center">Analyzing pedagogy...</div>
-  if (!data) return <div className="min-h-screen flex items-center justify-center">Audit report not found.</div>
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center gap-3">
+        <Loader2 className="w-6 h-6 animate-spin text-duo-green" />
+        <span className="text-duo-text font-bold">Analyzing pedagogy...</span>
+      </div>
+    )
+  }
+
+  if (error || !data) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <FoxMascot size="lg" expression="thinking" />
+          <AlertCircle className="w-10 h-10 text-red-400 mx-auto" />
+          <p className="text-duo-text font-bold text-lg">{error || "Audit report not found"}</p>
+          <Link href="/" className="btn-3d-primary inline-block">
+            Try another video
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
   const { result, videoMeta } = data
   const { overallScore, topPriority, dimensions, timestampedSuggestions } = result
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-white">
       {/* Header */}
-      <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="mx-auto max-w-6xl px-6 py-4">
-          <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
-              <span className="text-lg font-bold">LectureAI</span>
-            </Link>
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/" className="gap-2">
-                <ChevronLeft className="h-4 w-4" />
-                New Analysis
-              </Link>
-            </Button>
+      <header className="flex items-center justify-between px-6 py-4 border-b border-duo-border">
+        <div className="flex items-center gap-4">
+          <Link href="/" className="text-duo-text-muted hover:text-duo-text transition-colors">
+            <ArrowLeft className="w-6 h-6" />
+          </Link>
+          <div className="flex items-center gap-2">
+            <FoxMascot size="sm" expression="studying" animate={false} />
+            <span className="text-duo-green font-extrabold text-xl">LectureAI</span>
           </div>
         </div>
+        <span className="px-4 py-1.5 rounded-full bg-duo-purple/10 text-duo-purple text-xs font-bold uppercase tracking-wider">
+          Faculty Mode
+        </span>
       </header>
 
-      <main className="mx-auto max-w-6xl px-6 py-8">
-        {/* Top Section: Video Info + Score */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
-          <div>
-            <Badge variant="secondary" className="mb-2">
-              Faculty Mode
-            </Badge>
-            <h1 className="text-2xl font-bold text-foreground mb-1">
-              {videoMeta.title}
-            </h1>
-            <p className="text-muted-foreground">{videoMeta.author}</p>
-          </div>
-          <div className="flex flex-col items-center">
+      <main className="max-w-5xl mx-auto px-6 py-8">
+        {/* Video Info */}
+        <div className="mb-8">
+          <h1 className="text-2xl font-extrabold text-duo-text mb-1">
+            {videoMeta.title}
+          </h1>
+          <p className="text-duo-text-muted font-semibold">
+            {videoMeta.author}
+          </p>
+        </div>
+
+        {/* Overall Score & Top Priority */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          <div className="card-duo p-6 flex flex-col items-center">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-duo-text-muted mb-4">
+              Overall Score
+            </h2>
             <ScoreGauge score={overallScore} />
-            <span className="text-sm font-medium text-muted-foreground mt-2">
-              Overall Quality Score
-            </span>
+          </div>
+
+          <div className="lg:col-span-2 space-y-4">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-duo-text-muted">
+              Top Priority
+            </h2>
+            {topPriority && (
+              <div className="card-duo p-4 border-l-4 border-duo-orange">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-duo-orange flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <h3 className="font-bold text-duo-text mb-1">{topPriority.title}</h3>
+                    <p className="text-duo-text-muted text-sm font-semibold">
+                      {topPriority.description}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* High Priority Card */}
-        <Card className="mb-8 border-amber-300 bg-amber-50/50">
-          <CardHeader>
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100">
-                <AlertTriangle className="h-5 w-5 text-amber-600" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <CardTitle className="text-lg text-amber-900">
-                    Critical Improvement
-                  </CardTitle>
-                  {topPriority.timestamp && (
-                    <Badge className="bg-amber-200 text-amber-800 border-amber-300">
-                      <Clock className="h-3 w-3 mr-1" />
-                      {formatTime(topPriority.timestamp)}
-                    </Badge>
-                  )}
-                </div>
-                <CardDescription className="text-amber-800">
-                  Priority Action
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-amber-900 mb-4 leading-relaxed">
-              {topPriority.issue}
-            </p>
-            <div className="rounded-lg bg-amber-100/80 border border-amber-200 p-4">
-              <h4 className="text-xs font-semibold uppercase tracking-wide text-amber-700 mb-2 flex items-center gap-1.5">
-                <Lightbulb className="h-3.5 w-3.5" />
-                Suggested Action
-              </h4>
-              <p className="text-sm text-amber-900 leading-relaxed">
-                {topPriority.suggestion}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Grid of Audit Categories */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-          {dimensions.map((category: any) => {
-            const icons: Record<string, any> = { Clarity: Eye, Accessibility: Users, Equity: Users, Pacing: Gauge };
+        {/* Dimension Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          {dimensions.map((dim: any) => {
+            const meta = dimensionMeta[dim.name] || { icon: Eye, color: "duo-green", hex: "#58CC02" }
+            const IconComp = meta.icon
             return (
-              <AuditCard 
-                key={category.name} 
-                title={category.name}
-                icon={icons[category.name] || Sparkles}
-                score={category.score}
-                findings={category.findings}
-                recommendations={category.suggestions}
-              />
-            );
+              <div key={dim.name} className="card-duo p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center`} style={{ backgroundColor: `${meta.hex}15` }}>
+                    <IconComp className="w-5 h-5" style={{ color: meta.hex }} />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-bold text-duo-text">{dim.name}</h3>
+                    <span className="font-extrabold" style={{ color: meta.hex }}>{dim.score}/100</span>
+                  </div>
+                </div>
+                
+                <ProgressBar score={dim.score} color={meta.hex} />
+                
+                <p className="text-duo-text-muted text-sm font-semibold mt-4 mb-3">
+                  {dim.feedback}
+                </p>
+                
+                {dim.suggestions && dim.suggestions.length > 0 && (
+                  <div className="space-y-2">
+                    {dim.suggestions.map((suggestion: string, idx: number) => (
+                      <div key={idx} className="flex items-start gap-2 text-sm">
+                        <Lightbulb className="w-4 h-4 text-duo-yellow flex-shrink-0 mt-0.5" />
+                        <span className="text-duo-text font-semibold">{suggestion}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
           })}
         </div>
 
-        {/* Timestamped Suggestions Timeline */}
-        <div className="mb-8">
-          <div className="flex items-center gap-2 mb-6">
-            <h2 className="text-xl font-semibold text-foreground">
-              Timestamped Suggestions
+        {/* Timeline Suggestions */}
+        {timestampedSuggestions && timestampedSuggestions.length > 0 && (
+          <div className="card-duo p-6 mb-8">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-duo-text-muted mb-6">
+              Timeline Analysis
             </h2>
-            <Badge variant="outline">
-              {auditData.timelineSuggestions.length} items
-            </Badge>
-          </div>
-
-          <div className="pl-2">
-            {timestampedSuggestions.map((suggestion: any, index: number) => (
-              <TimelineSuggestion
-                key={index}
-                timestamp={formatTime(suggestion.timestamp)}
-                currentMoment={suggestion.issue}
-                suggestedRewrite={suggestion.rewrite}
-                isLast={index === timestampedSuggestions.length - 1}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Export Section */}
-        <Card className="bg-muted/30">
-          <CardContent className="py-6">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-              <div>
-                <h3 className="font-semibold text-foreground mb-1">
-                  Export Your Audit Report
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  Download a comprehensive PDF or share with your team
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline">Share Report</Button>
-                <Button>Download PDF</Button>
-              </div>
+            <div className="space-y-4">
+              {timestampedSuggestions.map((item: any, index: number) => (
+                <div 
+                  key={index}
+                  className={`flex items-start gap-4 p-3 rounded-xl ${
+                    item.type === "positive" ? "bg-duo-green/5" : "bg-duo-yellow/5"
+                  }`}
+                >
+                  <a
+                    href={item.youtubeLink || `https://www.youtube.com/watch?v=${videoMeta.videoId}&t=${Math.floor(item.timestamp)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 ${
+                      item.type === "positive" 
+                        ? "bg-duo-green/10 text-duo-green" 
+                        : "bg-duo-yellow/10 text-duo-text-muted"
+                    }`}
+                  >
+                    <Play className="w-3 h-3" />
+                    {formatTime(item.timestamp)}
+                  </a>
+                  <span className="text-duo-text font-semibold text-sm">
+                    {item.note}
+                  </span>
+                </div>
+              ))}
             </div>
-          </CardContent>
-        </Card>
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t border-border mt-12">
-        <div className="mx-auto max-w-6xl px-6 py-6">
-          <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground">
-            <Link href="#" className="hover:text-foreground transition-colors">
-              How it works
-            </Link>
-            <span className="text-border">|</span>
-            <Link href="#" className="hover:text-foreground transition-colors">
-              GitHub
-            </Link>
           </div>
+        )}
+
+        {/* New Analysis Button */}
+        <div className="text-center">
+          <Link href="/" className="btn-3d-primary inline-block">
+            New Analysis
+          </Link>
         </div>
-      </footer>
+      </main>
     </div>
-  );
+  )
 }

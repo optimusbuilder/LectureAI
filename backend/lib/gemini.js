@@ -8,21 +8,28 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 /**
  * High-level wrapper for Gemini 2.0 Flash
  */
-export const getGeminiResponse = async (systemPrompt, userPrompt) => {
+export const getGeminiResponse = async (systemPrompt, userPrompt, isJson = true) => {
   try {
-    const model = genAI.getGenerativeModel({ 
+    const config = {
       model: "gemini-2.0-flash",
       systemInstruction: systemPrompt,
-      generationConfig: {
+    };
+
+    if (isJson) {
+      config.generationConfig = {
         responseMimeType: "application/json",
-      }
-    });
+      };
+    }
+
+    const model = genAI.getGenerativeModel(config);
 
     const result = await model.generateContent(userPrompt);
     const response = await result.response;
     let text = response.text().trim();
 
-    // Secondary cleanup just in case
+    if (!isJson) return text;
+
+    // Secondary cleanup for JSON
     if (text.startsWith('```')) {
       text = text.replace(/^```json\n?/, '').replace(/\n?```$/, '').trim();
     }

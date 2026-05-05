@@ -1,22 +1,17 @@
 import type { Metadata } from 'next'
-import { Playfair_Display, Inter } from 'next/font/google'
+import { Nunito } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
-const playfairDisplay = Playfair_Display({ 
+const nunito = Nunito({ 
   subsets: ["latin"],
-  variable: "--font-playfair",
-  weight: ["400", "500", "600", "700", "800", "900"],
-});
-
-const inter = Inter({ 
-  subsets: ["latin"],
-  variable: "--font-inter",
-});
+  weight: ["400", "600", "700", "800", "900"],
+  variable: "--font-nunito"
+})
 
 export const metadata: Metadata = {
-  title: 'LectureAI - Turn any lecture into a study environment',
-  description: 'Paste a YouTube lecture URL to generate personalized study materials or a pedagogical audit.',
+  title: 'LectureAI - Learn Smarter, Not Harder',
+  description: 'Transform any YouTube lecture into a complete study environment with AI-powered outlines, summaries, flashcards, and more.',
   generator: 'v0.app',
   icons: {
     icon: [
@@ -43,8 +38,8 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="bg-background">
-      <body className={`${playfairDisplay.variable} ${inter.variable} font-sans antialiased`}>
+    <html lang="en" className="bg-white">
+      <body className={`${nunito.className} font-sans antialiased`}>
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>

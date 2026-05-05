@@ -32,3 +32,40 @@ export async function searchLecture(query: string, videoId: string) {
   }
   return res.json();
 }
+
+export async function regenerateStudentMaterials(jobId: string, language: string) {
+  const res = await fetch(`${BACKEND}/regenerate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ jobId, language })
+  });
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.message || 'Failed to regenerate materials');
+  }
+  return res.json();
+}
+
+export async function analyzeChunk(query: string, chunkText: string) {
+  const res = await fetch(`${BACKEND}/search/analyze`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, chunkText })
+  });
+  if (!res.ok) {
+    throw new Error('Analysis failed');
+  }
+  return res.json();
+}
+
+export async function getAudio(text: string) {
+  const res = await fetch(`${BACKEND}/tts`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text })
+  });
+  if (!res.ok) {
+    throw new Error('Failed to generate audio');
+  }
+  return res.blob();
+}

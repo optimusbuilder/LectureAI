@@ -44,6 +44,9 @@ async function processLecture(jobId, url, mode) {
     const intelligenceData = await intelligenceAgent(ingestionData);
     if (intelligenceData.error) throw new Error(intelligenceData.error);
 
+    // Cache intelligence data for language regeneration
+    updateJob(jobId, { intelligenceData });
+
     // Step 3: Indexing for Search
     updateJob(jobId, { step: 'Indexing for semantic search...' });
     await upsertChunks(ingestionData.videoId, intelligenceData.chunks);
@@ -56,6 +59,30 @@ async function processLecture(jobId, url, mode) {
     } else {
       updateJob(jobId, { step: 'Building your study materials...' });
       result = await studentAgent(intelligenceData);
+      
+      // Post-process: inject correct YouTube links using real videoId
+      if (!result.error) {
+        const vid = ingestionData.videoId;
+        const makeLink = (ts) => `https://www.youtube.com/watch?v=${vid}&t=${Math.floor(ts)}`;
+        
+        if (result.outline) {
+          result.outline = result.outline.map(item => ({
+            ...item,
+            youtubeLink: makeLink(item.timestamp || 0),
+            children: (item.children || []).map(child => ({
+              ...child,
+              youtubeLink: makeLink(child.timestamp || 0)
+            }))
+          }));
+        }
+        
+        if (result.flashcards) {
+          result.flashcards = result.flashcards.map(card => ({
+            ...card,
+            youtubeLink: makeLink(card.timestamp || 0)
+          }));
+        }
+      }
     }
     
     if (result.error) throw new Error(result.error);

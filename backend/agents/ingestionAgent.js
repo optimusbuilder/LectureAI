@@ -84,6 +84,9 @@ export const ingestionAgent = async (youtubeUrl) => {
     if (error.message.includes('private')) {
       return { error: 'PRIVATE_VIDEO' };
     }
+    if (error.message.includes('live') || error.message.includes('livestream') || error.message.includes('Live')) {
+      return { error: 'LIVESTREAM' };
+    }
     
     return { error: 'TRANSCRIPT_ERROR', message: error.message };
   }

@@ -1,45 +1,71 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Processing } from "@/components/processing"
-import { Button } from "@/components/ui/button"
-import { ArrowLeft, RotateCcw } from "lucide-react"
+import { useState, useEffect, Suspense } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { useSearchParams, useRouter } from "next/navigation"
-import { pollJob } from "@/lib/api"
+import { FoxMascot } from "@/components/fox-mascot"
+import { FoxGame } from "@/components/fox-game"
+import { pollJob, getAudio } from "@/lib/api"
+import { ArrowLeft, Check, Circle, Gamepad2, AlertCircle, Volume2 } from "lucide-react"
 
-type StepStatus = "complete" | "active" | "pending"
-
-interface Step {
-  id: string
-  label: string
-  status: StepStatus
-}
-
-const initialSteps: Step[] = [
-  { id: "transcript", label: "Extracting transcript", status: "active" },
-  { id: "analyze", label: "Analyzing lecture content", status: "pending" },
-  { id: "materials", label: "Building study materials", status: "pending" },
-  { id: "index", label: "Indexing for semantic search", status: "pending" },
+const steps = [
+  { id: "transcript", label: "Extracting transcript..." },
+  { id: "analyze", label: "Analyzing content structure..." },
+  { id: "materials", label: "Generating study materials..." },
+  { id: "index", label: "Building search index..." },
 ]
 
-export default function ProcessingPage() {
-  const [steps, setSteps] = useState<Step[]>(initialSteps)
-  const [progress, setProgress] = useState(5)
-  const [videoTitle, setVideoTitle] = useState<string | undefined>(undefined)
-  const [isComplete, setIsComplete] = useState(false)
+const stepVoices: Record<number, string> = {
+  0: "I'm on it! Let me grab that transcript real quick.",
+  1: "Got it. Now I'm breaking down the lecture structure for you.",
+  2: "Generating your study materials... this part is my favorite!",
+  3: "Almost ready! Just building your search engine now.",
+  4: "All done! I've prepared everything for you. Let's go!"
+}
 
-  const resetDemo = () => {
-    setSteps(initialSteps)
-    setProgress(5)
-    setVideoTitle(undefined)
-    setIsComplete(false)
+const errorMessages: Record<string, string> = {
+  "INVALID_URL": "That doesn't look like a valid YouTube URL. Please check and try again.",
+  "PRIVATE_VIDEO": "This video is private. Please use a public YouTube lecture URL.",
+  "LIVESTREAM": "Live streams aren't supported. Try a recorded lecture instead.",
+  "NO_CAPTIONS": "This video has no captions available. We need captions to analyze the lecture.",
+  "TRANSCRIPT_ERROR": "We couldn't extract the transcript. The video may be restricted.",
+}
+
+function ProcessingContent() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const jobId = searchParams.get("jobId")
+
+  const [currentStep, setCurrentStep] = useState(0)
+  const [isComplete, setIsComplete] = useState(false)
+  const [progress, setProgress] = useState(5)
+  const [error, setError] = useState<string | null>(null)
+  const [videoTitle, setVideoTitle] = useState<string | undefined>(undefined)
+  const [jobMode, setJobMode] = useState<string>("student")
+  const [playedVoices, setPlayedVoices] = useState<Set<number>>(new Set())
+
+  const playStepVoice = async (step: number) => {
+    if (playedVoices.has(step)) return
+    setPlayedVoices(prev => new Set(prev).add(step))
+    try {
+      const blob = await getAudio(stepVoices[step])
+      const url = URL.createObjectURL(blob)
+      const audio = new Audio(url)
+      audio.play()
+      audio.onended = () => URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error("Voice error:", err)
+    }
   }
 
-  const searchParams = useSearchParams()
-  const router = useRouter()
-  const jobId = searchParams.get("jobId")
-  const [error, setError] = useState<string | null>(null)
+  // Trigger voice on step change
+  useEffect(() => {
+    if (isComplete) {
+      playStepVoice(4)
+    } else {
+      playStepVoice(currentStep)
+    }
+  }, [currentStep, isComplete])
 
   useEffect(() => {
     if (!jobId || isComplete || error) return
@@ -47,41 +73,33 @@ export default function ProcessingPage() {
     const poll = async () => {
       try {
         const job = await pollJob(jobId)
-        
+
         if (job.status === "processing") {
-          setVideoTitle(job.videoMeta?.title || "Analyzing Lecture...")
-          
-          // Map backend steps to frontend steps
-          const stepMap: Record<string, string> = {
-            "Extracting transcript...": "transcript",
-            "Analyzing lecture content...": "analyze",
-            "Building your study materials...": "materials",
-            "Generating faculty report...": "materials",
-            "Indexing for semantic search...": "index"
+          if (job.videoMeta?.title) setVideoTitle(job.videoMeta.title)
+          if (job.mode) setJobMode(job.mode)
+
+          const stepMap: Record<string, number> = {
+            "Extracting transcript...": 0,
+            "Analyzing lecture content...": 1,
+            "Building your study materials...": 2,
+            "Generating faculty report...": 2,
+            "Indexing for semantic search...": 3,
           }
 
-          const currentStepId = stepMap[job.step]
-          if (currentStepId) {
-            setSteps((prev) => {
-              const currentIndex = prev.findIndex(s => s.id === currentStepId)
-              const newSteps = prev.map((step, idx) => {
-                if (idx < currentIndex) return { ...step, status: "complete" as const }
-                if (idx === currentIndex) return { ...step, status: "active" as const }
-                return { ...step, status: "pending" as const }
-              })
-              
-              // Correctly calculate progress based on the index
-              setProgress(25 + (currentIndex * 25))
-              return newSteps
-            })
+          const stepIndex = stepMap[job.step]
+          if (stepIndex !== undefined) {
+            setCurrentStep(stepIndex + 1)
+            setProgress(25 + stepIndex * 25)
           }
         } else if (job.status === "complete") {
           setProgress(100)
-          setSteps((prev) => prev.map(s => ({ ...s, status: "complete" as const })))
+          setCurrentStep(steps.length)
           setIsComplete(true)
-          setVideoTitle(job.videoMeta?.title)
+          if (job.videoMeta?.title) setVideoTitle(job.videoMeta.title)
+          if (job.mode) setJobMode(job.mode)
         } else if (job.status === "error") {
-          setError(job.message || "An error occurred")
+          const msg = errorMessages[job.errorCode] || job.message || "Something went wrong. Please try again."
+          setError(msg)
         }
       } catch (err) {
         console.error("Polling error:", err)
@@ -89,82 +107,175 @@ export default function ProcessingPage() {
     }
 
     const interval = setInterval(poll, 2000)
-    poll() // Initial call
-
+    poll()
     return () => clearInterval(interval)
   }, [jobId, isComplete, error])
 
-  const handleViewResults = async () => {
-    try {
-      const job = await pollJob(jobId!)
-      if (job.mode === "faculty") {
-        router.push(`/audit/${jobId}`)
-      } else {
-        router.push(`/dashboard/${jobId}`)
-      }
-    } catch (err) {
-      console.error(err)
+  const handleViewResults = () => {
+    if (jobMode === "faculty") {
+      router.push(`/audit/${jobId}`)
+    } else {
+      router.push(`/dashboard/${jobId}`)
     }
   }
 
-  return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
-      <header className="w-full border-b border-border">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link
-            href="/"
-            className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="size-4" />
-            <span className="text-sm font-medium">Back to LectureAI</span>
+  if (!jobId) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <FoxMascot size="lg" expression="thinking" />
+          <p className="text-duo-text font-bold text-lg">No job found</p>
+          <Link href="/" className="btn-3d-primary inline-block">
+            Go back
           </Link>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={resetDemo}
-            className="gap-2"
-          >
-            <RotateCcw className="size-4" />
-            Restart Demo
-          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-white">
+      {/* Header */}
+      <header className="flex items-center gap-4 px-6 py-4 border-b border-duo-border">
+        <Link href="/" className="text-duo-text-muted hover:text-duo-text transition-colors">
+          <ArrowLeft className="w-6 h-6" />
+        </Link>
+        <div className="flex items-center gap-2">
+          <FoxMascot size="sm" expression="happy" animate={false} />
+          <span className="text-duo-green font-extrabold text-xl">LectureAI</span>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="flex-1 flex items-center justify-center px-6 py-16">
-        <div className="w-full max-w-md space-y-6">
-          <div className="text-center space-y-2">
-            <h1 className="text-2xl font-bold text-foreground">
-              Processing Your Lecture
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              {isComplete
-                ? "Analysis complete! Your study materials are ready."
-                : "Please wait while we analyze your lecture..."}
-            </p>
-          </div>
-
-          <Processing
-            videoTitle={videoTitle}
-            steps={steps}
-            progress={progress}
+      <main className="max-w-2xl mx-auto px-6 py-12">
+        {/* Fox Mascot */}
+        <div className="flex justify-center mb-8">
+          <FoxMascot 
+            size="lg" 
+            expression={error ? "thinking" : isComplete ? "celebrating" : "thinking"} 
           />
-
-          {isComplete && (
-            <div className="flex justify-center">
-              <Button onClick={handleViewResults} className="gap-2">
-                View {steps[2].label === "Generating faculty report" ? "Faculty Report" : "Study Materials"}
-              </Button>
-            </div>
-          )}
-          {error && (
-            <div className="p-4 bg-destructive/10 text-destructive rounded-lg text-sm text-center">
-              {error}
-            </div>
-          )}
         </div>
+
+        {/* Title */}
+        <h1 className="text-2xl md:text-3xl font-extrabold text-duo-text text-center mb-2">
+          {error ? "Oops!" : isComplete ? "All done! 🎉" : "Your fox is analyzing..."}
+        </h1>
+        
+        {videoTitle && !error && (
+          <p className="text-duo-text-muted font-semibold text-center mb-8 truncate max-w-md mx-auto">
+            {videoTitle}
+          </p>
+        )}
+
+        {/* Error State */}
+        {error ? (
+          <div className="space-y-6">
+            <div className="card-duo p-6 border-l-4 border-red-400">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                <p className="text-duo-text font-semibold">{error}</p>
+              </div>
+            </div>
+            <div className="text-center">
+              <Link href="/" className="btn-3d-primary inline-block">
+                Try Another Video
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Progress Card */}
+            <div className="card-duo p-6 mb-8">
+              {/* Progress Bar */}
+              <div className="progress-duo mb-6">
+                <div 
+                  className="progress-duo-bar" 
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+
+              {/* Steps */}
+              <div className="space-y-4">
+                {steps.map((step, index) => {
+                  const isCompleted = index < currentStep
+                  const isActive = index === currentStep && !isComplete
+                  
+                  return (
+                    <div key={step.id} className="flex items-center gap-3">
+                      {isCompleted ? (
+                        <div className="w-6 h-6 rounded-full bg-duo-green flex items-center justify-center">
+                          <Check className="w-4 h-4 text-white" />
+                        </div>
+                      ) : isActive ? (
+                        <div className="w-6 h-6 rounded-full bg-duo-green animate-pulse-dot" />
+                      ) : (
+                        <Circle className="w-6 h-6 text-duo-border" />
+                      )}
+                      <span className={`font-semibold ${
+                        isCompleted ? "text-duo-text" : 
+                        isActive ? "text-duo-green" : 
+                        "text-duo-text-muted"
+                      }`}>
+                        {step.label}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {!isComplete && (
+                <p className="text-duo-text-muted font-semibold text-sm text-center mt-6">
+                  This usually takes 30-60 seconds
+                </p>
+              )}
+            </div>
+
+            {/* View Results Button */}
+            {isComplete && (
+              <button
+                onClick={handleViewResults}
+                className="btn-3d-primary w-full text-base py-4 mb-12"
+              >
+                View Results
+              </button>
+            )}
+
+            {/* Mini Game Section */}
+            {!isComplete && (
+              <div className="text-center">
+                <div className="flex items-center justify-center gap-2 mb-4">
+                  <Gamepad2 className="w-5 h-5 text-duo-orange" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-duo-text-muted">
+                    Play While You Wait
+                  </span>
+                </div>
+                
+                <div className="flex justify-center">
+                  <FoxGame />
+                </div>
+                
+                <p className="text-duo-text-muted font-semibold text-sm mt-3">
+                  Space or Click to jump
+                </p>
+              </div>
+            )}
+          </>
+        )}
       </main>
     </div>
+  )
+}
+
+export default function ProcessingPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="flex items-center gap-2">
+          <FoxMascot size="md" expression="thinking" />
+          <span className="text-duo-green font-extrabold text-xl">Loading...</span>
+        </div>
+      </div>
+    }>
+      <ProcessingContent />
+    </Suspense>
   )
 }
