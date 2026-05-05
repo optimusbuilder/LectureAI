@@ -70,6 +70,9 @@ RULES:
     return { ...report, error: null };
   } catch (error) {
     console.error('Faculty Agent Error:', error);
-    return { error: 'FACULTY_AUDIT_FAILED', message: error.message };
+    const errorCode = error.message === 'GEMINI_OUTPUT_TRUNCATED'
+      ? 'GEMINI_OUTPUT_TRUNCATED'
+      : 'FACULTY_AUDIT_FAILED';
+    return { error: errorCode, message: error.message };
   }
 };

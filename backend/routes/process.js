@@ -119,7 +119,8 @@ const getErrorMessage = (code) => {
     'TRANSCRIPT_ERROR': "We couldn't extract the transcript.",
     'ANALYSIS_FAILED': "Gemini failed to analyze the lecture.",
     'STUDENT_OUTPUT_FAILED': "Failed to generate study materials.",
-    'FACULTY_AUDIT_FAILED': "Failed to generate faculty report."
+    'FACULTY_AUDIT_FAILED': "Failed to generate faculty report.",
+    'GEMINI_OUTPUT_TRUNCATED': "The lecture output was too large to generate in one pass. Try a shorter video while we tune this flow."
   };
   return errors[code] || "Something went wrong. Please try again.";
 };

@@ -91,6 +91,9 @@ RULES:
     return { ...analysis, chunks, error: null };
   } catch (error) {
     console.error('Intelligence Agent Error:', error);
-    return { error: 'ANALYSIS_FAILED', message: error.message };
+    const errorCode = error.message === 'GEMINI_OUTPUT_TRUNCATED'
+      ? 'GEMINI_OUTPUT_TRUNCATED'
+      : 'ANALYSIS_FAILED';
+    return { error: errorCode, message: error.message };
   }
 };

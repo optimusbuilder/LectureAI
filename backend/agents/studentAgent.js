@@ -28,11 +28,13 @@ Strictly raw JSON matching the provided schema. No markdown. No preamble.
  * Responsibility: Generate study materials based on lecture intelligence.
  */
 export const studentAgent = async (intelligenceData, targetLanguage = 'en') => {
+  const { chunks, error, ...studyMaterialSource } = intelligenceData;
+
   const userPrompt = `
 Using this lecture analysis, generate complete student study materials.
 
 ANALYSIS:
-${JSON.stringify(intelligenceData, null, 2)}
+${JSON.stringify(studyMaterialSource, null, 2)}
 
 TARGET LANGUAGE: ${targetLanguage}
 
@@ -76,6 +78,9 @@ RULES:
     return { ...output, error: null };
   } catch (error) {
     console.error('Student Agent Error:', error);
-    return { error: 'STUDENT_OUTPUT_FAILED', message: error.message };
+    const errorCode = error.message === 'GEMINI_OUTPUT_TRUNCATED'
+      ? 'GEMINI_OUTPUT_TRUNCATED'
+      : 'STUDENT_OUTPUT_FAILED';
+    return { error: errorCode, message: error.message };
   }
 };
