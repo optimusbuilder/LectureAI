@@ -1,5 +1,3 @@
-import { YoutubeTranscript } from 'youtube-transcript';
-
 /**
  * Extracts Video ID from various YouTube URL formats
  * @param {string} url 
@@ -33,6 +31,76 @@ export const fetchMetadata = async (url) => {
 };
 
 /**
+ * Parses WebVTT format into JSON segments
+ */
+const parseVTT = (vttText) => {
+  const segments = [];
+  const lines = vttText.split('\n');
+  
+  const parseTime = (timeStr) => {
+    const parts = timeStr.trim().split(':');
+    const secsAndMs = parts.pop().split('.');
+    let total = parseInt(secsAndMs[0], 10) + (parseInt(secsAndMs[1] || '0', 10) / 1000);
+    if (parts.length > 0) total += parseInt(parts.pop(), 10) * 60; // minutes
+    if (parts.length > 0) total += parseInt(parts.pop(), 10) * 3600; // hours
+    return total;
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line || line === 'WEBVTT') continue;
+    
+    if (line.includes('-->')) {
+      const [startStr, endStr] = line.split('-->');
+      const start = parseTime(startStr);
+      const end = parseTime(endStr);
+      
+      let textLines = [];
+      let j = i + 1;
+      while (j < lines.length && lines[j].trim() !== '' && !lines[j].includes('-->')) {
+        textLines.push(lines[j].replace(/<[^>]+>/g, '').trim()); // Strip HTML/formatting tags
+        j++;
+      }
+      
+      if (textLines.length > 0) {
+        segments.push({
+          start: Math.floor(start),
+          duration: Math.floor(end - start),
+          text: textLines.join(' ')
+        });
+      }
+      i = j - 1; // Skip the text lines we just processed
+    }
+  }
+  return segments;
+};
+
+/**
+ * Fetches transcript from RapidAPI
+ */
+const fetchTranscriptRapidAPI = async (videoId) => {
+  if (!process.env.X_RAPIDAPI_KEY) {
+    throw new Error('Missing X_RAPIDAPI_KEY in environment variables');
+  }
+
+  const response = await fetch(`https://youtube-captions-transcript-subtitles-video-combiner.p.rapidapi.com/download-webvtt/${videoId}?language=en&response_mode=default`, {
+    headers: {
+      'x-rapidapi-key': process.env.X_RAPIDAPI_KEY,
+      'x-rapidapi-host': 'youtube-captions-transcript-subtitles-video-combiner.p.rapidapi.com'
+    }
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    console.error('RapidAPI Error:', text);
+    throw new Error('RAPIDAPI_FETCH_FAILED');
+  }
+
+  const vttText = await response.text();
+  return parseVTT(vttText);
+};
+
+/**
  * Ingestion Agent
  * Responsibility: Extract transcript and metadata from YouTube URL
  */
@@ -47,17 +115,21 @@ export const ingestionAgent = async (youtubeUrl) => {
     // 1. Fetch metadata and transcript in parallel
     const [metadata, transcriptSegments] = await Promise.all([
       fetchMetadata(youtubeUrl),
-      YoutubeTranscript.fetchTranscript(videoId)
+      fetchTranscriptRapidAPI(videoId)
     ]);
+
+    if (!transcriptSegments || transcriptSegments.length === 0) {
+      throw new Error('NO_CAPTIONS');
+    }
 
     // 2. Format the full transcript for the Intelligence Agent
     const fullTranscript = transcriptSegments
-      .map(segment => `[${Math.floor(segment.offset / 1000)}] ${segment.text}`)
+      .map(segment => `[${segment.start}] ${segment.text}`)
       .join(' ');
 
     // 3. Calculate total duration (approximate from last segment)
     const lastSegment = transcriptSegments[transcriptSegments.length - 1];
-    const duration = lastSegment ? Math.floor((lastSegment.offset + lastSegment.duration) / 1000) : 0;
+    const duration = lastSegment ? Math.floor(lastSegment.start + lastSegment.duration) : 0;
 
     return {
       videoId,
@@ -65,11 +137,7 @@ export const ingestionAgent = async (youtubeUrl) => {
       author: metadata.author,
       thumbnail: metadata.thumbnail,
       duration,
-      transcriptSegments: transcriptSegments.map(s => ({
-        text: s.text,
-        start: Math.floor(s.offset / 1000),
-        duration: Math.floor(s.duration / 1000)
-      })),
+      transcriptSegments,
       fullTranscript,
       error: null
     };
@@ -78,14 +146,8 @@ export const ingestionAgent = async (youtubeUrl) => {
     console.error('Ingestion Agent Error:', error);
     
     // Categorize common errors
-    if (error.message.includes('Could not find transcript')) {
+    if (error.message === 'NO_CAPTIONS' || error.message.includes('Could not find transcript')) {
       return { error: 'NO_CAPTIONS' };
-    }
-    if (error.message.includes('private')) {
-      return { error: 'PRIVATE_VIDEO' };
-    }
-    if (error.message.includes('live') || error.message.includes('livestream') || error.message.includes('Live')) {
-      return { error: 'LIVESTREAM' };
     }
     
     return { error: 'TRANSCRIPT_ERROR', message: error.message };
