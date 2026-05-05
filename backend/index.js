@@ -20,7 +20,7 @@ const allowedOrigins = [
   process.env.FRONTEND_URL
 ].filter(Boolean);
 
-app.use(cors({
+const corsOptions = {
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
@@ -31,10 +31,13 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
-}));
+};
 
-// Explicitly handle preflight requests for all routes
-app.options('*', cors());
+// Handle preflight for ALL routes first, before any other middleware
+app.options('*', cors(corsOptions));
+
+// Then apply CORS to all other requests
+app.use(cors(corsOptions));
 
 app.use(express.json());
 
