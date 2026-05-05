@@ -55,7 +55,6 @@ export const getGeminiResponse = async (systemPrompt, userPrompt, isJson = true)
       try {
         return JSON.parse(text);
       } catch (parseError) {
-        console.error('JSON Parse Error. Raw output:', text);
         throw new Error('FAILED_TO_PARSE_GEMINI_JSON');
       }
     }
