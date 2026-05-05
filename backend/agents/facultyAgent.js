@@ -37,23 +37,23 @@ Return a JSON object with this exact schema:
 {
   "overallScore": number (0-100),
   "topPriority": { 
-    "issue": "string", 
-    "timestamp": number, 
-    "suggestion": "string" 
+    "title": "string — short title of the issue", 
+    "description": "string — detailed explanation with suggested fix",
+    "timestamp": number
   },
   "dimensions": [
     { 
       "name": "string (Clarity|Accessibility|Equity|Pacing)", 
-      "score": number, 
-      "findings": ["string"], 
+      "score": number (0-100), 
+      "feedback": "string — 2-3 sentence summary of findings for this dimension",
       "suggestions": ["string"] 
     }
   ],
   "timestampedSuggestions": [
     { 
-      "timestamp": number, 
-      "issue": "string", 
-      "rewrite": "string" 
+      "timestamp": number (seconds into the lecture), 
+      "note": "string — what the issue is and how to fix it",
+      "type": "string (positive|improvement)"
     }
   ]
 }
@@ -61,7 +61,8 @@ Return a JSON object with this exact schema:
 RULES:
 1. "topPriority" must be the single most impactful change the instructor can make.
 2. Provide 3-5 specific "timestampedSuggestions" for specific moments in the transcript.
-3. Frames all suggestions as a coach helping a colleague.
+3. Frame all suggestions as a coach helping a colleague. Use "positive" type for things done well, "improvement" for suggested changes.
+4. Every dimension MUST have "Clarity", "Accessibility", "Equity", or "Pacing" as its name.
 `;
 
   try {

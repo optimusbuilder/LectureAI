@@ -13,14 +13,16 @@ export function FoxGame({ className }: FoxGameProps) {
   const [highScore, setHighScore] = useState(0)
   
   const gameRef = useRef({
-    fox: { x: 50, y: 150, vy: 0, width: 40, height: 40 },
-    obstacles: [] as { x: number; type: "books" | "coffee" | "pencil"; width: number; height: number }[],
-    groundY: 180,
-    gravity: 0.6,
-    jumpForce: -12,
-    speed: 4,
+    fox: { x: 100, y: 150, vy: 0, width: 45, height: 45 },
+    obstacles: [] as { x: number; y: number; type: "books" | "coffee" | "pencil" | "bird"; width: number; height: number; speedMultiplier?: number }[],
+    groundY: 210,
+    gravity: 0.7,
+    jumpForce: -13,
+    speed: 5,
     frameCount: 0,
     isJumping: false,
+    particles: [] as { x: number; y: number; vx: number; vy: number; life: number }[],
+    groundOffset: 0
   })
 
   const drawFox = useCallback((ctx: CanvasRenderingContext2D, x: number, y: number, size: number) => {
@@ -156,7 +158,30 @@ export function FoxGame({ className }: FoxGameProps) {
       
       // Metal band
       ctx.fillStyle = "#C0C0C0"
-      ctx.fillRect(x + 5, y + 8, 10, 3)
+    } else if (type === "bird") {
+      // Procrastination Bird
+      ctx.fillStyle = "#CE82FF"
+      ctx.beginPath()
+      ctx.ellipse(x + 15, y + 10, 15, 10, 0, 0, Math.PI * 2)
+      ctx.fill()
+      
+      // Wings
+      const wingOffset = Math.sin(Date.now() / 100) * 10
+      ctx.beginPath()
+      ctx.moveTo(x + 15, y + 10)
+      ctx.lineTo(x, y - wingOffset)
+      ctx.lineTo(x + 10, y + 10)
+      ctx.fill()
+      
+      // Eye
+      ctx.fillStyle = "white"
+      ctx.beginPath()
+      ctx.arc(x + 22, y + 7, 3, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = "black"
+      ctx.beginPath()
+      ctx.arc(x + 24, y + 7, 1.5, 0, Math.PI * 2)
+      ctx.fill()
     }
   }, [])
 
@@ -210,13 +235,24 @@ export function FoxGame({ className }: FoxGameProps) {
       ctx.fillStyle = "#FFFFFF"
       ctx.fillRect(0, 0, canvas.width, canvas.height)
       
-      // Draw ground
+      // Draw ground with texture
       ctx.strokeStyle = "#58CC02"
-      ctx.lineWidth = 3
+      ctx.lineWidth = 4
       ctx.beginPath()
       ctx.moveTo(0, game.groundY)
       ctx.lineTo(canvas.width, game.groundY)
       ctx.stroke()
+      
+      // Moving ground details
+      ctx.strokeStyle = "#E5E5E5"
+      ctx.lineWidth = 2
+      game.groundOffset = (game.groundOffset + game.speed) % 100
+      for (let i = -game.groundOffset; i < canvas.width; i += 100) {
+        ctx.beginPath()
+        ctx.moveTo(i, game.groundY + 10)
+        ctx.lineTo(i + 40, game.groundY + 10)
+        ctx.stroke()
+      }
 
       if (gameState === "idle") {
         // Draw idle state
@@ -241,33 +277,42 @@ export function FoxGame({ className }: FoxGameProps) {
         }
         
         // Spawn obstacles
-        if (game.frameCount % 100 === 0) {
-          const types: ("books" | "coffee" | "pencil")[] = ["books", "coffee", "pencil"]
+        if (game.frameCount % 90 === 0) {
+          const types: ("books" | "coffee" | "pencil" | "bird")[] = ["books", "coffee", "pencil", "bird"]
           const type = types[Math.floor(Math.random() * types.length)]
-          const heights = { books: 30, coffee: 35, pencil: 45 }
-          const widths = { books: 25, coffee: 30, pencil: 20 }
+          const heights = { books: 35, coffee: 40, pencil: 50, bird: 25 }
+          const widths = { books: 30, coffee: 35, pencil: 25, bird: 35 }
+          
+          let y = game.groundY - heights[type]
+          if (type === "bird") {
+            // Birds fly at different levels
+            y = game.groundY - 60 - Math.random() * 60
+          }
+          
           game.obstacles.push({
             x: canvas.width,
+            y,
             type,
             width: widths[type],
             height: heights[type],
+            speedMultiplier: type === "bird" ? 1.2 : 1
           })
         }
         
         // Update and draw obstacles
         game.obstacles = game.obstacles.filter(obs => {
-          obs.x -= game.speed
+          obs.x -= game.speed * (obs.speedMultiplier || 1)
           
           // Collision detection
           const foxBox = {
-            x: game.fox.x + 5,
-            y: game.fox.y + 5,
-            width: game.fox.width - 10,
-            height: game.fox.height - 10,
+            x: game.fox.x + 10,
+            y: game.fox.y + 10,
+            width: game.fox.width - 20,
+            height: game.fox.height - 20,
           }
           const obsBox = {
             x: obs.x,
-            y: game.groundY - obs.height,
+            y: obs.y,
             width: obs.width,
             height: obs.height,
           }
@@ -346,9 +391,9 @@ export function FoxGame({ className }: FoxGameProps) {
   return (
     <canvas
       ref={canvasRef}
-      width={400}
-      height={200}
-      className={`rounded-2xl border-2 border-duo-border cursor-pointer ${className}`}
+      width={800}
+      height={250}
+      className={`rounded-3xl border-4 border-duo-border cursor-pointer shadow-lg w-full max-w-3xl ${className}`}
     />
   )
 }

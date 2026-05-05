@@ -47,11 +47,7 @@ async function processLecture(jobId, url, mode) {
     // Cache intelligence data for language regeneration
     updateJob(jobId, { intelligenceData });
 
-    // Step 3: Indexing for Search
-    updateJob(jobId, { step: 'Indexing for semantic search...' });
-    await upsertChunks(ingestionData.videoId, intelligenceData.chunks);
-
-    // Step 4: Mode-specific Output
+    // Step 3: Mode-specific Output
     let result;
     if (mode === 'faculty') {
       updateJob(jobId, { step: 'Generating faculty report...' });
@@ -86,6 +82,10 @@ async function processLecture(jobId, url, mode) {
     }
     
     if (result.error) throw new Error(result.error);
+
+    // Step 4: Indexing for Search (last step)
+    updateJob(jobId, { step: 'Indexing for semantic search...' });
+    await upsertChunks(ingestionData.videoId, intelligenceData.chunks);
 
     // Completion
     updateJob(jobId, { 

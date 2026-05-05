@@ -11,14 +11,34 @@ const pc = new Pinecone({
 const index = pc.index(process.env.PINECONE_INDEX_NAME || 'lecture-ai');
 
 /**
- * Upserts lecture chunks into Pinecone
+ * Wipes all vectors for a specific video namespace
+ * @param {string} videoId 
+ */
+export const clearNamespace = async (videoId) => {
+  try {
+    console.log(`Wiping namespace for video ${videoId}...`);
+    const ns = index.namespace(videoId);
+    await ns.deleteAll();
+  } catch (error) {
+    // If namespace doesn't exist, Pinecone might throw, which is fine
+    console.log(`Namespace ${videoId} already clean or empty.`);
+  }
+};
+
+/**
+ * Upserts lecture chunks into Pinecone using Namespaces
  * @param {string} videoId 
  * @param {Array} chunks 
  */
 export const upsertChunks = async (videoId, chunks) => {
-  console.log(`Indexing ${chunks.length} chunks for video ${videoId}...`);
+  // First, ensure a fresh slate for this video
+  await clearNamespace(videoId);
   
+  console.log(`Indexing ${chunks.length} chunks into namespace ${videoId}...`);
+  
+  const ns = index.namespace(videoId);
   const vectors = [];
+  
   for (const chunk of chunks) {
     const values = await getEmbedding(chunk.text);
     vectors.push({
@@ -32,30 +52,30 @@ export const upsertChunks = async (videoId, chunks) => {
       }
     });
     // Tiny delay to be safe with free tier rate limits
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise(resolve => setTimeout(resolve, 50));
   }
 
-  // Batch upsert (max 100 per call recommended)
+  // Batch upsert
   for (let i = 0; i < vectors.length; i += 100) {
     const batch = vectors.slice(i, i + 100);
-    await index.upsert(batch);
+    await ns.upsert(batch);
   }
   
   console.log('Indexing complete.');
 };
 
 /**
- * Searches for relevant moments in a lecture
+ * Searches for relevant moments within a specific video's namespace
  * @param {string} videoId 
  * @param {string} query 
  * @param {number} topK 
  */
 export const searchChunks = async (videoId, query, topK = 3) => {
   const queryVector = await getEmbedding(query);
+  const ns = index.namespace(videoId);
   
-  const queryResponse = await index.query({
+  const queryResponse = await ns.query({
     vector: queryVector,
-    filter: { videoId: { '$eq': videoId } },
     topK,
     includeMetadata: true
   });

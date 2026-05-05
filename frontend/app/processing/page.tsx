@@ -43,16 +43,36 @@ function ProcessingContent() {
   const [videoTitle, setVideoTitle] = useState<string | undefined>(undefined)
   const [jobMode, setJobMode] = useState<string>("student")
   const [playedVoices, setPlayedVoices] = useState<Set<number>>(new Set())
+  const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const playStepVoice = async (step: number) => {
     if (playedVoices.has(step)) return
-    setPlayedVoices(prev => new Set(prev).add(step))
+    
+    // Kill existing audio immediately
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current.currentTime = 0
+      audioRef.current = null
+    }
+
+    setPlayedVoices(prev => {
+      const next = new Set(prev)
+      next.add(step)
+      return next
+    })
+
     try {
       const blob = await getAudio(stepVoices[step])
       const url = URL.createObjectURL(blob)
       const audio = new Audio(url)
-      audio.play()
-      audio.onended = () => URL.revokeObjectURL(url)
+      audioRef.current = audio
+      
+      audio.play().catch(e => console.error("Audio playback interrupted", e))
+      
+      audio.onended = () => {
+        URL.revokeObjectURL(url)
+        if (audioRef.current === audio) audioRef.current = null
+      }
     } catch (err) {
       console.error("Voice error:", err)
     }
@@ -64,6 +84,13 @@ function ProcessingContent() {
       playStepVoice(4)
     } else {
       playStepVoice(currentStep)
+    }
+
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current = null
+      }
     }
   }, [currentStep, isComplete])
 

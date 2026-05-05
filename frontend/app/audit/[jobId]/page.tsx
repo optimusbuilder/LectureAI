@@ -29,18 +29,19 @@ function ScoreGauge({ score }: { score: number }) {
   }
 
   return (
-    <div className="relative w-32 h-32">
+    <div className="relative w-48 h-48">
       <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-        <circle cx="50" cy="50" r="45" fill="none" stroke="#E5E5E5" strokeWidth="8" />
+        <circle cx="50" cy="50" r="45" fill="none" stroke="#E5E5E5" strokeWidth="10" />
         <circle
           cx="50" cy="50" r="45" fill="none"
-          stroke={getColor(score)} strokeWidth="8" strokeLinecap="round"
+          stroke={getColor(score)} strokeWidth="10" strokeLinecap="round"
           strokeDasharray={circumference} strokeDashoffset={strokeDashoffset}
           className="transition-all duration-1000 ease-out"
         />
       </svg>
-      <div className="absolute inset-0 flex items-center justify-center">
-        <span className="text-3xl font-black text-duo-text">{score}</span>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-5xl font-black text-duo-text">{score}</span>
+        <span className="text-xs font-black uppercase tracking-widest text-duo-text-muted">Quality</span>
       </div>
     </div>
   )
@@ -143,7 +144,7 @@ export default function AuditPage() {
         </span>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-8">
+      <main className="max-w-7xl mx-auto px-6 py-12">
         {/* Video Info */}
         <div className="mb-8">
           <h1 className="text-2xl font-extrabold text-duo-text mb-1">
@@ -223,32 +224,34 @@ export default function AuditPage() {
 
         {/* Timeline Suggestions */}
         {timestampedSuggestions && timestampedSuggestions.length > 0 && (
-          <div className="card-duo p-6 mb-8">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-duo-text-muted mb-6">
-              Timeline Analysis
+          <div className="card-duo p-8 mb-12 bg-duo-surface/30">
+            <h2 className="text-base font-black uppercase tracking-wider text-duo-text-muted mb-8">
+              Pedagogical Timeline Analysis
             </h2>
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-4">
               {timestampedSuggestions.map((item: any, index: number) => (
                 <div 
                   key={index}
-                  className={`flex items-start gap-4 p-3 rounded-xl ${
-                    item.type === "positive" ? "bg-duo-green/5" : "bg-duo-yellow/5"
+                  className={`flex items-start gap-6 p-5 rounded-3xl border-2 transition-all hover:scale-[1.01] ${
+                    item.type === "positive" 
+                      ? "bg-white border-duo-green/20" 
+                      : "bg-white border-duo-yellow/20"
                   }`}
                 >
                   <a
                     href={item.youtubeLink || `https://www.youtube.com/watch?v=${videoMeta.videoId}&t=${Math.floor(item.timestamp)}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 ${
+                    className={`flex-shrink-0 px-4 py-2 rounded-2xl text-sm font-black flex items-center gap-2 border-b-4 ${
                       item.type === "positive" 
-                        ? "bg-duo-green/10 text-duo-green" 
-                        : "bg-duo-yellow/10 text-duo-text-muted"
+                        ? "bg-duo-green text-white border-duo-green-dark" 
+                        : "bg-duo-yellow text-duo-text border-duo-yellow-dark"
                     }`}
                   >
-                    <Play className="w-3 h-3" />
+                    <Play className="w-4 h-4 fill-current" />
                     {formatTime(item.timestamp)}
                   </a>
-                  <span className="text-duo-text font-semibold text-sm">
+                  <span className="text-duo-text font-bold text-lg flex-1">
                     {item.note}
                   </span>
                 </div>

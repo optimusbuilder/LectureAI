@@ -141,6 +141,31 @@ export default function DashboardPage() {
     }
   }
 
+  const playStepVoice = async (step: number, stepVoices: Record<number, string>) => {
+    if (playedVoices.has(step)) return
+    
+    // Stop previous audio if playing
+    if (currentAudio) {
+      currentAudio.pause()
+      currentAudio.currentTime = 0
+    }
+
+    setPlayedVoices(prev => new Set(prev).add(step))
+    try {
+      const blob = await getAudio(stepVoices[step])
+      const url = URL.createObjectURL(blob)
+      const audio = new Audio(url)
+      setCurrentAudio(audio)
+      audio.play()
+      audio.onended = () => {
+        URL.revokeObjectURL(url)
+        setCurrentAudio(null)
+      }
+    } catch (err) {
+      console.error("Voice error:", err)
+    }
+  }
+
   const handlePlayAudio = async (text: string, id: string) => {
     if (audioLoadingId || playingAudioId) return
     setAudioLoadingId(id)
@@ -351,20 +376,20 @@ export default function DashboardPage() {
         <div className="flex-1 overflow-y-auto p-6">
           {/* Summary Tab */}
           {activeTab === "summary" && (
-            <div className="max-w-3xl">
-              <div className="flex items-center gap-2 mb-6">
-                <div className="flex gap-2">
+            <div className="max-w-4xl mx-auto">
+              <div className="flex items-center gap-4 mb-8">
+                <div className="flex gap-3">
                   {(["short", "medium", "full"] as const).map((depth) => (
                     <button
                       key={depth}
                       onClick={() => setSummaryDepth(depth)}
-                      className={`px-5 py-2 rounded-full font-bold text-xs uppercase tracking-wider transition-all ${
+                      className={`px-6 py-3 rounded-full font-extrabold text-sm uppercase tracking-wider transition-all ${
                         summaryDepth === depth
                           ? "bg-duo-green text-white border-b-4 border-duo-green-dark"
                           : "bg-white text-duo-text border-2 border-duo-border border-b-4 hover:bg-duo-surface"
                       }`}
                     >
-                      {depth === "short" ? "90 Sec" : depth === "medium" ? "5 Min" : "Full"}
+                      {depth === "short" ? "90 Sec" : depth === "medium" ? "5 Min" : "Full Study"}
                     </button>
                   ))}
                 </div>
@@ -373,22 +398,22 @@ export default function DashboardPage() {
                   <button
                     onClick={() => handlePlayAudio(summaries.short, "summary-short")}
                     disabled={!!audioLoadingId || !!playingAudioId}
-                    className="flex items-center gap-2 px-4 py-2 rounded-full bg-duo-blue text-white font-bold text-xs uppercase tracking-wider border-b-4 border-duo-blue-dark disabled:opacity-50 transition-all hover:-translate-y-0.5 active:translate-y-0"
+                    className="flex items-center gap-2 px-6 py-3 rounded-full bg-duo-blue text-white font-extrabold text-sm uppercase tracking-wider border-b-4 border-duo-blue-dark disabled:opacity-50 transition-all hover:-translate-y-0.5 active:translate-y-0"
                   >
                     {audioLoadingId === "summary-short" ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <Loader2 className="w-4 h-4 animate-spin" />
                     ) : playingAudioId === "summary-short" ? (
-                      <VolumeX className="w-3.5 h-3.5" />
+                      <VolumeX className="w-4 h-4" />
                     ) : (
-                      <Volume2 className="w-3.5 h-3.5" />
+                      <Volume2 className="w-4 h-4" />
                     )}
-                    {playingAudioId === "summary-short" ? "Playing..." : "Listen"}
+                    {playingAudioId === "summary-short" ? "Playing..." : "Listen to Key Takeaways"}
                   </button>
                 )}
               </div>
 
-              <div className="prose prose-lg max-w-none">
-                <div className="text-duo-text font-semibold leading-relaxed whitespace-pre-line">
+              <div className="prose prose-xl max-w-none">
+                <div className="text-duo-text font-bold text-lg md:text-xl leading-relaxed whitespace-pre-line bg-duo-surface/50 p-8 rounded-3xl border-2 border-duo-border/50">
                   {summaries[summaryDepth]}
                 </div>
               </div>
@@ -397,87 +422,105 @@ export default function DashboardPage() {
 
           {/* Flashcards Tab */}
           {activeTab === "flashcards" && flashcards && flashcards.length > 0 && (
-            <div className="max-w-2xl mx-auto">
-              <div className="flex items-center justify-center gap-2 mb-6">
-                <div className="w-10 h-10 rounded-full bg-duo-green flex items-center justify-center">
-                  <span className="text-white font-extrabold">{currentCard + 1}</span>
+            <div className="max-w-4xl mx-auto py-4">
+              <div className="flex items-center justify-center gap-3 mb-8">
+                <div className="w-12 h-12 rounded-full bg-duo-green flex items-center justify-center border-b-4 border-duo-green-dark shadow-sm">
+                  <span className="text-white text-xl font-black">{currentCard + 1}</span>
                 </div>
-                <span className="text-duo-text-muted font-semibold">
-                  of {flashcards.length} cards
+                <span className="text-duo-text-muted font-black text-lg">
+                  of {flashcards.length} Mastery Cards
                 </span>
               </div>
 
               <div 
-                className="flashcard-container mb-6 cursor-pointer"
+                className="flashcard-container mb-12 cursor-pointer h-[480px]"
                 onClick={() => setIsFlipped(!isFlipped)}
               >
-                <div className={`flashcard relative h-72 ${isFlipped ? "flipped" : ""}`}>
+                <div className={`flashcard relative h-full ${isFlipped ? "flipped" : ""}`}>
                   {/* Front */}
-                  <div className={`flashcard-face absolute inset-0 card-duo p-6 border-l-4 border-${cardColors[currentCard % cardColors.length]} flex flex-col`}>
-                    <span className={`self-start px-3 py-1 rounded-full bg-${cardColors[currentCard % cardColors.length]}/10 text-${cardColors[currentCard % cardColors.length]} text-xs font-bold uppercase mb-4`}>
-                      Question
+                  <div className={`flashcard-face absolute inset-0 card-duo p-12 border-b-8 border-${cardColors[currentCard % cardColors.length]} flex flex-col shadow-xl`}>
+                    <span className={`self-start px-4 py-2 rounded-2xl bg-${cardColors[currentCard % cardColors.length]}/10 text-${cardColors[currentCard % cardColors.length]} text-sm font-black uppercase tracking-widest mb-4 flex-shrink-0`}>
+                      Critical Question
                     </span>
-                    <div className="flex-1 flex items-center justify-center">
-                      <p className="text-xl font-bold text-duo-text text-center">
+                    <div className="flex-1 flex items-center justify-center overflow-y-auto custom-scrollbar pr-2">
+                      <p className="text-2xl md:text-3xl lg:text-4xl font-black text-duo-text text-center leading-tight">
                         {flashcards[currentCard].front}
                       </p>
                     </div>
-                    <p className="text-duo-text-muted text-sm font-semibold text-center">
-                      Click or press Space to reveal answer
-                    </p>
+                    <div className="flex items-center justify-center gap-2 text-duo-text-muted font-bold mt-4 flex-shrink-0">
+                      <span className="animate-bounce">👇</span>
+                      <span>Tap to reveal the answer</span>
+                    </div>
                   </div>
 
                   {/* Back */}
-                  <div className="flashcard-face flashcard-back absolute inset-0 card-duo p-6 border-l-4 border-duo-green flex flex-col">
-                    <span className="self-start px-3 py-1 rounded-full bg-duo-green/10 text-duo-green text-xs font-bold uppercase mb-4">
-                      Answer
+                  <div className="flashcard-face flashcard-back absolute inset-0 card-duo p-12 border-b-8 border-duo-green flex flex-col shadow-xl">
+                    <span className="self-start px-4 py-2 rounded-2xl bg-duo-green/10 text-duo-green text-sm font-black uppercase tracking-widest mb-8">
+                      Expert Answer
                     </span>
                     <div className="flex-1 flex items-center justify-center">
-                      <p className="text-lg font-semibold text-duo-text text-center">
+                      <p className="text-2xl md:text-3xl font-bold text-duo-text text-center leading-relaxed">
                         {flashcards[currentCard].back}
                       </p>
                     </div>
-                    <a
-                      href={flashcards[currentCard].youtubeLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="self-center flex items-center gap-2 text-duo-blue font-bold text-sm hover:underline"
-                    >
-                      <Play className="w-4 h-4" />
-                      Watch at {formatTime(flashcards[currentCard].timestamp)}
-                    </a>
+                    <div className="flex flex-col items-center gap-4 mt-8">
+                      <a
+                        href={flashcards[currentCard].youtubeLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="flex items-center gap-3 bg-duo-blue text-white px-8 py-3 rounded-full font-black text-sm uppercase tracking-widest border-b-4 border-duo-blue-dark hover:-translate-y-0.5 active:translate-y-0 transition-all"
+                      >
+                        <Play className="w-5 h-5 fill-current" />
+                        Watch Proof at {formatTime(flashcards[currentCard].timestamp)}
+                      </a>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center justify-center gap-4">
-                <button onClick={prevCard} className="btn-3d-secondary flex items-center gap-2 px-6">
-                  <ChevronLeft className="w-4 h-4" />
-                  Prev
+              <div className="flex items-center justify-center gap-8">
+                <button 
+                  onClick={prevCard} 
+                  className="btn-3d-secondary flex items-center gap-3 px-8 py-4 text-lg"
+                >
+                  <ChevronLeft className="w-6 h-6" />
+                  Previous
                 </button>
 
-                <div className="flex gap-2">
+                <div className="flex gap-3">
                   {flashcards.map((_: any, index: number) => (
                     <button
                       key={index}
                       onClick={() => { setIsFlipped(false); setCurrentCard(index) }}
-                      className={`w-2.5 h-2.5 rounded-full transition-colors ${
-                        index === currentCard ? "bg-duo-green" : "bg-duo-border"
+                      className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                        index === currentCard 
+                          ? "bg-duo-green scale-150 shadow-sm" 
+                          : "bg-duo-border hover:bg-duo-text-muted"
                       }`}
                     />
                   ))}
                 </div>
 
-                <button onClick={nextCard} className="btn-3d-primary flex items-center gap-2 px-6">
-                  Next
-                  <ChevronRight className="w-4 h-4" />
+                <button 
+                  onClick={nextCard} 
+                  className="btn-3d-primary flex items-center gap-3 px-10 py-4 text-lg"
+                >
+                  Next Card
+                  <ChevronRight className="w-6 h-6" />
                 </button>
               </div>
 
-              <p className="text-center text-duo-text-muted text-sm font-semibold mt-6">
-                ← → to navigate · Space to flip
-              </p>
+              <div className="flex items-center justify-center gap-4 mt-12 text-duo-text-muted font-bold bg-duo-surface p-4 rounded-2xl">
+                <div className="flex gap-2">
+                  <kbd className="px-3 py-1 bg-white border-2 border-duo-border rounded-lg text-sm shadow-sm">←</kbd>
+                  <kbd className="px-3 py-1 bg-white border-2 border-duo-border rounded-lg text-sm shadow-sm">→</kbd>
+                </div>
+                <span className="text-sm">Navigate</span>
+                <div className="w-px h-4 bg-duo-border mx-2" />
+                <kbd className="px-4 py-1 bg-white border-2 border-duo-border rounded-lg text-sm shadow-sm">SPACE</kbd>
+                <span className="text-sm">Flip Card</span>
+              </div>
             </div>
           )}
 
@@ -493,24 +536,24 @@ export default function DashboardPage() {
 
           {/* Search Tab */}
           {activeTab === "search" && (
-            <div className="max-w-2xl mx-auto">
-              <form onSubmit={handleSearch} className="flex gap-3 mb-8">
+            <div className="max-w-4xl mx-auto">
+              <form onSubmit={handleSearch} className="flex gap-4 mb-12">
                 <div className="relative flex-1">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-duo-text-muted" />
+                  <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-6 h-6 text-duo-text-muted" />
                   <input
                     type="text"
-                    placeholder="Search the lecture..."
+                    placeholder="Search for any concept, fact, or question from the lecture..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="input-duo pl-12"
+                    className="input-duo pl-14 py-4 text-lg"
                   />
                 </div>
                 <button 
                   type="submit" 
                   disabled={isSearching || searchQuery.trim().length < 2}
-                  className="btn-3d-primary disabled:opacity-50"
+                  className="btn-3d-primary px-10 py-4 text-base disabled:opacity-50"
                 >
-                  {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : "Search"}
+                  {isSearching ? <Loader2 className="w-5 h-5 animate-spin" /> : "Search Lecture"}
                 </button>
               </form>
 
