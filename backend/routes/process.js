@@ -18,9 +18,9 @@ router.post('/', processLimiter, async (req, res) => {
   }
 
   const jobId = generateJobId();
-  createJob(jobId, mode || 'student');
+  await createJob(jobId, mode || 'student');
 
-  // Start processing async
+  // Start processing async (not awaited — returns immediately)
   processLecture(jobId, youtubeUrl, mode || 'student');
 
   res.json({ jobId, status: 'processing' });
@@ -33,27 +33,39 @@ import { facultyAgent } from '../agents/facultyAgent.js';
 import { upsertChunks } from '../lib/pinecone.js';
 
 async function processLecture(jobId, url, mode) {
+  const timing = {};
+  const startTotal = Date.now();
+
   try {
     // Step 1: Ingestion
-    updateJob(jobId, { step: 'Extracting transcript...' });
+    await updateJob(jobId, { step: 'Extracting transcript...' });
+    const t1 = Date.now();
     const ingestionData = await ingestionAgent(url);
+    timing.ingestion = Date.now() - t1;
     if (ingestionData.error) throw new Error(ingestionData.error);
 
+    console.log(`[${jobId}] Ingestion complete in ${timing.ingestion}ms — ${ingestionData.transcriptSegments?.length} segments`);
+
     // Step 2: Content Intelligence
-    updateJob(jobId, { step: 'Analyzing lecture content...', videoMeta: ingestionData });
+    await updateJob(jobId, { step: 'Analyzing lecture content...', videoMeta: ingestionData });
+    const t2 = Date.now();
     const intelligenceData = await intelligenceAgent(ingestionData);
+    timing.intelligence = Date.now() - t2;
     if (intelligenceData.error) throw new Error(intelligenceData.error);
 
+    console.log(`[${jobId}] Intelligence complete in ${timing.intelligence}ms — ${intelligenceData.topics?.length || 0} topics, ${intelligenceData.chunks?.length || 0} chunks`);
+
     // Cache intelligence data for language regeneration
-    updateJob(jobId, { intelligenceData });
+    await updateJob(jobId, { intelligenceData });
 
     // Step 3: Mode-specific Output
     let result;
+    const t3 = Date.now();
     if (mode === 'faculty') {
-      updateJob(jobId, { step: 'Generating faculty report...' });
+      await updateJob(jobId, { step: 'Generating faculty report...' });
       result = await facultyAgent(intelligenceData, ingestionData);
     } else {
-      updateJob(jobId, { step: 'Building your study materials...' });
+      await updateJob(jobId, { step: 'Building your study materials...' });
       result = await studentAgent(intelligenceData);
       
       // Post-process: inject correct YouTube links using real videoId
@@ -80,28 +92,37 @@ async function processLecture(jobId, url, mode) {
         }
       }
     }
+    timing.output = Date.now() - t3;
     
     if (result.error) throw new Error(result.error);
 
+    console.log(`[${jobId}] ${mode === 'faculty' ? 'Faculty' : 'Student'} output complete in ${timing.output}ms`);
+
     // Step 4: Indexing for Search (last step)
-    updateJob(jobId, { step: 'Indexing for semantic search...' });
+    await updateJob(jobId, { step: 'Indexing for semantic search...' });
+    const t4 = Date.now();
     let searchAvailable = true;
     try {
       await upsertChunks(ingestionData.videoId, intelligenceData.chunks);
     } catch (indexError) {
       console.error(`Search indexing failed for job ${jobId}:`, indexError);
       searchAvailable = false;
-      updateJob(jobId, {
+      await updateJob(jobId, {
         searchIndexError: indexError.message,
         searchAvailable: false
       });
     }
+    timing.indexing = Date.now() - t4;
+    timing.total = Date.now() - startTotal;
+
+    console.log(`[${jobId}] Pipeline complete in ${timing.total}ms | ingestion=${timing.ingestion}ms intelligence=${timing.intelligence}ms output=${timing.output}ms indexing=${timing.indexing}ms`);
 
     // Completion
-    updateJob(jobId, { 
+    await updateJob(jobId, { 
       status: 'complete', 
       result,
       searchAvailable,
+      timing,
       videoMeta: {
         title: ingestionData.title,
         videoId: ingestionData.videoId,
@@ -112,11 +133,13 @@ async function processLecture(jobId, url, mode) {
     });
 
   } catch (error) {
-    console.error(`Error processing job ${jobId}:`, error);
-    updateJob(jobId, { 
+    timing.total = Date.now() - startTotal;
+    console.error(`[${jobId}] Pipeline failed in ${timing.total}ms:`, error.message);
+    await updateJob(jobId, { 
       status: 'error', 
       errorCode: error.message,
-      message: getErrorMessage(error.message) 
+      message: getErrorMessage(error.message),
+      timing
     });
   }
 }

@@ -8,6 +8,19 @@ const GEMINI_EMBEDDING_MODEL = process.env.GEMINI_EMBEDDING_MODEL || 'gemini-emb
 const GEMINI_EMBEDDING_DIMENSIONS = 768;
 
 const JSON_PARSE_PREVIEW_CHARS = 700;
+const MAX_RETRIES = 2;
+const INITIAL_BACKOFF_MS = 1000;
+
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+const isRetryable = (error) => {
+  const msg = error?.message || '';
+  const status = error?.status || error?.httpStatus;
+  if (status === 429 || status === 503 || status === 500) return true;
+  if (msg.includes('429') || msg.includes('503') || msg.includes('RESOURCE_EXHAUSTED')) return true;
+  if (msg.includes('overloaded') || msg.includes('unavailable') || msg.includes('ECONNRESET')) return true;
+  return false;
+};
 
 const extractJsonCandidate = (text) => {
   const trimmed = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
@@ -45,43 +58,42 @@ const formatParseDiagnostics = (text, response, parseError) => ({
 });
 
 /**
- * High-level wrapper for Gemini 2.0 Flash
+ * Core Gemini call (single attempt, no retry)
  */
-export const getGeminiResponse = async (systemPrompt, userPrompt, isJson = true) => {
+const callGemini = async (systemPrompt, userPrompt, isJson) => {
+  const config = {
+    model: "gemini-2.0-flash",
+    systemInstruction: systemPrompt,
+    generationConfig: {
+      maxOutputTokens: 8192,
+      temperature: isJson ? 0.2 : 0.7,
+    }
+  };
+
+  if (isJson) {
+    config.generationConfig.responseMimeType = "application/json";
+  }
+
+  const model = genAI.getGenerativeModel(config);
+
+  const result = await model.generateContent(userPrompt);
+  const response = await result.response;
+  let text = response.text().trim();
+
+  if (!isJson) return text;
+
+  const finishReason = response?.candidates?.[0]?.finishReason;
+  if (finishReason === 'MAX_TOKENS') {
+    console.error('Gemini JSON response was truncated:', formatParseDiagnostics(text, response, new Error('MAX_TOKENS')));
+    throw new Error('GEMINI_OUTPUT_TRUNCATED');
+  }
+
   try {
-    const config = {
-      model: "gemini-2.0-flash",
-      systemInstruction: systemPrompt,
-      generationConfig: {
-        maxOutputTokens: 8192,
-        temperature: isJson ? 0.2 : 0.7,
-      }
-    };
+    return parseJsonResponse(text);
+  } catch (parseError) {
+    console.error('Gemini returned invalid JSON, attempting repair:', formatParseDiagnostics(text, response, parseError));
 
-    if (isJson) {
-      config.generationConfig.responseMimeType = "application/json";
-    }
-
-    const model = genAI.getGenerativeModel(config);
-
-    const result = await model.generateContent(userPrompt);
-    const response = await result.response;
-    let text = response.text().trim();
-
-    if (!isJson) return text;
-
-    const finishReason = response?.candidates?.[0]?.finishReason;
-    if (finishReason === 'MAX_TOKENS') {
-      console.error('Gemini JSON response was truncated:', formatParseDiagnostics(text, response, new Error('MAX_TOKENS')));
-      throw new Error('GEMINI_OUTPUT_TRUNCATED');
-    }
-
-    try {
-      return parseJsonResponse(text);
-    } catch (parseError) {
-      console.error('Gemini returned invalid JSON, attempting repair:', formatParseDiagnostics(text, response, parseError));
-
-      const repairPrompt = `
+    const repairPrompt = `
 The following model output was intended to be JSON but failed to parse.
 Return ONLY corrected, valid JSON. Do not add markdown, comments, or explanations.
 
@@ -89,21 +101,44 @@ INVALID OUTPUT:
 ${text}
 `;
 
-      const repairResult = await model.generateContent(repairPrompt);
-      const repairResponse = await repairResult.response;
-      const repairedText = repairResponse.text().trim();
+    const repairResult = await model.generateContent(repairPrompt);
+    const repairResponse = await repairResult.response;
+    const repairedText = repairResponse.text().trim();
 
-      try {
-        return parseJsonResponse(repairedText);
-      } catch (repairError) {
-        console.error('Gemini JSON repair failed:', formatParseDiagnostics(repairedText, repairResponse, repairError));
-        throw new Error('FAILED_TO_PARSE_GEMINI_JSON');
-      }
+    try {
+      return parseJsonResponse(repairedText);
+    } catch (repairError) {
+      console.error('Gemini JSON repair failed:', formatParseDiagnostics(repairedText, repairResponse, repairError));
+      throw new Error('FAILED_TO_PARSE_GEMINI_JSON');
     }
-  } catch (error) {
-    console.error('Gemini API Error:', error);
-    throw error;
   }
+};
+
+/**
+ * High-level wrapper for Gemini 2.0 Flash with retry + exponential backoff
+ */
+export const getGeminiResponse = async (systemPrompt, userPrompt, isJson = true) => {
+  let lastError;
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      return await callGemini(systemPrompt, userPrompt, isJson);
+    } catch (error) {
+      lastError = error;
+
+      if (attempt < MAX_RETRIES && isRetryable(error)) {
+        const backoff = INITIAL_BACKOFF_MS * Math.pow(2, attempt);
+        console.warn(`Gemini call failed (attempt ${attempt + 1}/${MAX_RETRIES + 1}), retrying in ${backoff}ms:`, error.message);
+        await sleep(backoff);
+        continue;
+      }
+
+      break;
+    }
+  }
+
+  console.error('Gemini API Error (all retries exhausted):', lastError);
+  throw lastError;
 };
 
 /**

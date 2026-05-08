@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createJob, updateJob, getJob, generateJobId } from '../lib/jobStore.js';
 
 describe('jobStore', () => {
@@ -13,10 +13,10 @@ describe('jobStore', () => {
   });
 
   describe('createJob / getJob', () => {
-    it('creates a job with default fields', () => {
+    it('creates a job with default fields', async () => {
       const jobId = generateJobId();
-      createJob(jobId, 'student');
-      const job = getJob(jobId);
+      await createJob(jobId, 'student');
+      const job = await getJob(jobId);
 
       expect(job).toMatchObject({
         status: 'processing',
@@ -28,26 +28,26 @@ describe('jobStore', () => {
       });
     });
 
-    it('returns undefined for non-existent job', () => {
-      expect(getJob('nonexistent_id')).toBeUndefined();
+    it('returns undefined for non-existent job', async () => {
+      expect(await getJob('nonexistent_id')).toBeUndefined();
     });
   });
 
   describe('updateJob', () => {
-    it('merges updates into existing job', () => {
+    it('merges updates into existing job', async () => {
       const jobId = generateJobId();
-      createJob(jobId, 'faculty');
-      updateJob(jobId, { step: 'Analyzing...', videoMeta: { title: 'Test' } });
+      await createJob(jobId, 'faculty');
+      await updateJob(jobId, { step: 'Analyzing...', videoMeta: { title: 'Test' } });
 
-      const job = getJob(jobId);
+      const job = await getJob(jobId);
       expect(job.step).toBe('Analyzing...');
       expect(job.videoMeta).toEqual({ title: 'Test' });
       expect(job.mode).toBe('faculty');
     });
 
-    it('does nothing for non-existent job', () => {
-      updateJob('fake_id', { step: 'nope' });
-      expect(getJob('fake_id')).toBeUndefined();
+    it('does nothing for non-existent job', async () => {
+      await updateJob('fake_id', { step: 'nope' });
+      expect(await getJob('fake_id')).toBeUndefined();
     });
   });
 });
