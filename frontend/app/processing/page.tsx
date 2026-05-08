@@ -16,7 +16,6 @@ const steps = [
 ]
 
 const stepVoices: Record<number, string> = {
-  0: "I'm on it! Let me grab that transcript real quick.",
   1: "Got it. Now I'm breaking down the lecture structure for you.",
   2: "Generating your study materials... this part is my favorite!",
   3: "Almost ready! Just building your search engine now.",
@@ -46,6 +45,7 @@ function ProcessingContent() {
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const playStepVoice = async (step: number) => {
+    if (!stepVoices[step]) return
     if (playedVoices.has(step)) return
     
     // Kill existing audio immediately

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useEffect, useMemo } from "react"
 import { FoxMascot } from "./fox-mascot"
 import { chatWithTopic } from "@/lib/api"
 import { 
@@ -40,30 +40,67 @@ interface KnowledgeMapProps {
 }
 
 const NODE_COLORS = [
-  { bg: "#58CC02", border: "#458B00", light: "#58CC0220" },
-  { bg: "#1CB0F6", border: "#1899D6", light: "#1CB0F620" },
-  { bg: "#FF9600", border: "#E87600", light: "#FF960020" },
-  { bg: "#CE82FF", border: "#A855F7", light: "#CE82FF20" },
-  { bg: "#FFC800", border: "#E5B300", light: "#FFC80020" },
+  { bg: "#1CB0F6", text: "#fff" },
+  { bg: "#58CC02", text: "#fff" },
+  { bg: "#FF9600", text: "#fff" },
+  { bg: "#CE82FF", text: "#fff" },
+  { bg: "#FF4B4B", text: "#fff" },
+  { bg: "#FFC800", text: "#3C3C3C" },
+  { bg: "#1899D6", text: "#fff" },
+  { bg: "#89E219", text: "#3C3C3C" },
 ]
 
-function computeLayout(topics: Topic[], width: number, height: number) {
-  const nodes: { x: number; y: number; topic: Topic; color: typeof NODE_COLORS[0] }[] = []
-  const count = topics.length
-  if (count === 0) return nodes
+interface NodePosition {
+  x: number
+  y: number
+  radius: number
+  topic: Topic
+  color: typeof NODE_COLORS[0]
+}
 
-  const centerX = width / 2
-  const centerY = height / 2
-  const radiusX = Math.min(width * 0.35, 300)
-  const radiusY = Math.min(height * 0.35, 220)
+function seededRandom(seed: number) {
+  const x = Math.sin(seed) * 10000
+  return x - Math.floor(x)
+}
+
+function computeLayout(topics: Topic[], width: number, height: number): NodePosition[] {
+  if (topics.length === 0) return []
+
+  const nodes: NodePosition[] = []
+  const padding = 70
+  const usableWidth = width - padding * 2
+  const usableHeight = height - padding * 2
+
+  const minRadius = 32
+  const maxRadius = 52
+
+  // Calculate node sizes based on topic duration
+  const durations = topics.map(t => (t.endTime || 0) - (t.startTime || 0))
+  const maxDuration = Math.max(...durations, 1)
+
+  // Place nodes using a force-relaxed grid with seeded randomness for determinism
+  const cols = Math.ceil(Math.sqrt(topics.length * (usableWidth / usableHeight)))
+  const rows = Math.ceil(topics.length / cols)
+  const cellW = usableWidth / cols
+  const cellH = usableHeight / rows
 
   topics.forEach((topic, i) => {
-    const angle = (2 * Math.PI * i) / count - Math.PI / 2
-    const x = centerX + radiusX * Math.cos(angle)
-    const y = centerY + radiusY * Math.sin(angle)
+    const col = i % cols
+    const row = Math.floor(i / cols)
+    const durationRatio = durations[i] / maxDuration
+    const radius = minRadius + (maxRadius - minRadius) * Math.max(durationRatio, 0.4)
+
+    // Deterministic scattered position within grid cell
+    const jitterX = (seededRandom(i * 7 + 3) - 0.5) * cellW * 0.5
+    const jitterY = (seededRandom(i * 13 + 7) - 0.5) * cellH * 0.4
+
+    const x = padding + cellW * (col + 0.5) + jitterX
+    const y = padding + cellH * (row + 0.5) + jitterY
+
     nodes.push({
-      x,
-      y,
+      x: Math.max(padding + radius, Math.min(width - padding - radius, x)),
+      y: Math.max(padding + radius, Math.min(height - padding - radius, y)),
+      radius,
       topic,
       color: NODE_COLORS[i % NODE_COLORS.length]
     })
@@ -73,12 +110,11 @@ function computeLayout(topics: Topic[], width: number, height: number) {
 }
 
 export function KnowledgeMap({ topics, connections, videoId, jobId }: KnowledgeMapProps) {
-  const svgRef = useRef<SVGSVGElement>(null)
   const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null)
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [chatInput, setChatInput] = useState("")
   const [isSending, setIsSending] = useState(false)
-  const [dimensions, setDimensions] = useState({ width: 700, height: 500 })
+  const [dimensions, setDimensions] = useState({ width: 750, height: 500 })
   const chatEndRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -89,7 +125,7 @@ export function KnowledgeMap({ topics, connections, videoId, jobId }: KnowledgeM
       if (entry) {
         setDimensions({
           width: entry.contentRect.width,
-          height: Math.max(entry.contentRect.height, 450)
+          height: Math.max(entry.contentRect.height, 480)
         })
       }
     })
@@ -101,11 +137,12 @@ export function KnowledgeMap({ topics, connections, videoId, jobId }: KnowledgeM
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [chatMessages])
 
-  const nodes = computeLayout(topics, dimensions.width, dimensions.height)
+  const nodes = useMemo(
+    () => computeLayout(topics, dimensions.width, dimensions.height),
+    [topics, dimensions.width, dimensions.height]
+  )
 
-  const getNodeById = useCallback((id: string) => {
-    return nodes.find(n => n.topic.id === id)
-  }, [nodes])
+  const getNodeById = (id: string) => nodes.find(n => n.topic.id === id)
 
   const handleNodeClick = (topic: Topic) => {
     setSelectedTopic(topic)
@@ -164,113 +201,112 @@ export function KnowledgeMap({ topics, connections, videoId, jobId }: KnowledgeM
   return (
     <div className="flex h-full gap-4">
       {/* Map Area */}
-      <div className={`flex-1 relative ${selectedTopic ? 'w-3/5' : 'w-full'} transition-all duration-300`}>
-        <div ref={containerRef} className="w-full h-[500px] card-duo overflow-hidden relative">
-          {/* Header */}
-          <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full border border-duo-border">
-            <Compass className="w-4 h-4 text-duo-green" />
+      <div className={`${selectedTopic ? 'w-3/5' : 'w-full'} transition-all duration-300`}>
+        <div ref={containerRef} className="w-full h-[500px] card-duo overflow-hidden relative bg-gradient-to-br from-white to-duo-surface/50">
+          {/* Header badge */}
+          <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full border border-duo-border shadow-sm">
+            <Compass className="w-4 h-4 text-duo-purple" />
             <span className="text-xs font-bold text-duo-text-muted uppercase tracking-wider">Knowledge Map</span>
           </div>
 
           <svg
-            ref={svgRef}
             viewBox={`0 0 ${dimensions.width} ${dimensions.height}`}
             className="w-full h-full"
-            style={{ minHeight: 450 }}
+            style={{ minHeight: 480 }}
           >
-            {/* Connections (edges) */}
+            {/* Edges */}
             {connections.map((conn, i) => {
               const fromNode = getNodeById(conn.from)
               const toNode = getNodeById(conn.to)
               if (!fromNode || !toNode) return null
 
+              const isSelectedEdge =
+                selectedTopic?.id === conn.from || selectedTopic?.id === conn.to
+
+              // Curved path with slight offset for visual interest
               const midX = (fromNode.x + toNode.x) / 2
               const midY = (fromNode.y + toNode.y) / 2
-              const offsetX = (toNode.y - fromNode.y) * 0.15
-              const offsetY = (fromNode.x - toNode.x) * 0.15
+              const dx = toNode.x - fromNode.x
+              const dy = toNode.y - fromNode.y
+              const offset = 20 + (i % 3) * 10
+              const cpX = midX + (dy / Math.hypot(dx, dy)) * offset * (i % 2 === 0 ? 1 : -1)
+              const cpY = midY - (dx / Math.hypot(dx, dy)) * offset * (i % 2 === 0 ? 1 : -1)
 
               return (
-                <g key={`edge-${i}`}>
-                  <path
-                    d={`M ${fromNode.x} ${fromNode.y} Q ${midX + offsetX} ${midY + offsetY} ${toNode.x} ${toNode.y}`}
-                    fill="none"
-                    stroke="#E5E5E5"
-                    strokeWidth="2"
-                    strokeDasharray="6 4"
-                    className="transition-all duration-300"
-                  />
-                  {/* Relationship label */}
-                  <text
-                    x={midX + offsetX * 0.5}
-                    y={midY + offsetY * 0.5}
-                    textAnchor="middle"
-                    className="fill-duo-text-muted text-[9px] font-semibold"
-                    dy="-4"
-                  >
-                    {conn.relationship}
-                  </text>
-                </g>
+                <path
+                  key={`edge-${i}`}
+                  d={`M ${fromNode.x} ${fromNode.y} Q ${cpX} ${cpY} ${toNode.x} ${toNode.y}`}
+                  fill="none"
+                  stroke={isSelectedEdge ? fromNode.color.bg : fromNode.color.bg}
+                  strokeWidth={isSelectedEdge ? 3 : 2}
+                  strokeOpacity={isSelectedEdge ? 0.8 : 0.25}
+                  className="transition-all duration-300"
+                />
               )
             })}
 
             {/* Nodes */}
             {nodes.map((node, i) => {
               const isSelected = selectedTopic?.id === node.topic.id
-              const radius = isSelected ? 48 : 40
+              const displayRadius = isSelected ? node.radius + 6 : node.radius
+              const title = node.topic.title
+              const maxChars = Math.floor(node.radius / 4.5)
+              const lines = title.length > maxChars
+                ? [title.slice(0, maxChars), title.slice(maxChars, maxChars * 2).trim() + (title.length > maxChars * 2 ? "…" : "")]
+                : [title]
 
               return (
                 <g
                   key={node.topic.id || i}
-                  className="cursor-pointer transition-transform duration-200"
+                  className="cursor-pointer"
                   onClick={() => handleNodeClick(node.topic)}
                 >
-                  {/* Glow ring for selected */}
+                  {/* Selection glow */}
                   {isSelected && (
                     <circle
                       cx={node.x}
                       cy={node.y}
-                      r={radius + 8}
+                      r={displayRadius + 6}
                       fill="none"
                       stroke={node.color.bg}
                       strokeWidth="3"
-                      opacity="0.3"
+                      strokeOpacity="0.4"
                       className="animate-pulse"
                     />
                   )}
 
-                  {/* Node circle */}
+                  {/* Shadow */}
+                  <circle
+                    cx={node.x}
+                    cy={node.y + 3}
+                    r={displayRadius}
+                    fill="black"
+                    fillOpacity="0.08"
+                  />
+
+                  {/* Main circle */}
                   <circle
                     cx={node.x}
                     cy={node.y}
-                    r={radius}
-                    fill={isSelected ? node.color.bg : "white"}
-                    stroke={node.color.bg}
-                    strokeWidth={isSelected ? 4 : 3}
-                    className="transition-all duration-200 hover:scale-110"
-                    style={{ transformOrigin: `${node.x}px ${node.y}px` }}
+                    r={displayRadius}
+                    fill={node.color.bg}
+                    className="transition-all duration-200"
                   />
 
-                  {/* Topic number */}
-                  <text
-                    x={node.x}
-                    y={node.y - 6}
-                    textAnchor="middle"
-                    className={`text-[11px] font-black ${isSelected ? 'fill-white' : 'fill-duo-text-muted'}`}
-                  >
-                    {formatTime(node.topic.startTime)}
-                  </text>
-
-                  {/* Topic title (truncated) */}
-                  <text
-                    x={node.x}
-                    y={node.y + 10}
-                    textAnchor="middle"
-                    className={`text-[10px] font-bold ${isSelected ? 'fill-white' : 'fill-duo-text'}`}
-                  >
-                    {node.topic.title.length > 16
-                      ? node.topic.title.slice(0, 14) + "…"
-                      : node.topic.title}
-                  </text>
+                  {/* Label */}
+                  {lines.map((line, lineIdx) => (
+                    <text
+                      key={lineIdx}
+                      x={node.x}
+                      y={node.y + (lineIdx - (lines.length - 1) / 2) * 13}
+                      textAnchor="middle"
+                      dominantBaseline="central"
+                      fill={node.color.text}
+                      className="text-[11px] font-bold pointer-events-none select-none"
+                    >
+                      {line}
+                    </text>
+                  ))}
                 </g>
               )
             })}
@@ -278,7 +314,7 @@ export function KnowledgeMap({ topics, connections, videoId, jobId }: KnowledgeM
 
           {/* Hint */}
           {!selectedTopic && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-full border border-duo-border">
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-full border border-duo-border shadow-sm">
               <span className="text-xs font-bold text-duo-text-muted">Click any topic to explore & chat</span>
             </div>
           )}
@@ -306,7 +342,7 @@ export function KnowledgeMap({ topics, connections, videoId, jobId }: KnowledgeM
             <h3 className="font-bold text-duo-text text-sm">{selectedTopic.title}</h3>
             <p className="text-xs text-duo-text-muted font-semibold mt-1 line-clamp-2">{selectedTopic.summary}</p>
             
-            <div className="flex items-center gap-2 mt-2">
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
               <a
                 href={`https://www.youtube.com/watch?v=${videoId}&t=${Math.floor(selectedTopic.startTime)}`}
                 target="_blank"
@@ -317,7 +353,7 @@ export function KnowledgeMap({ topics, connections, videoId, jobId }: KnowledgeM
                 {formatTime(selectedTopic.startTime)}
               </a>
               {selectedTopic.keyTerms?.slice(0, 3).map((term, i) => (
-                <span key={i} className="px-2 py-0.5 rounded-full bg-duo-surface text-duo-text-muted text-[10px] font-bold">
+                <span key={i} className="px-2 py-0.5 rounded-full bg-duo-surface text-duo-text-muted text-[10px] font-bold border border-duo-border">
                   {term}
                 </span>
               ))}
