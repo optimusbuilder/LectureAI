@@ -34,7 +34,7 @@ export const analyzeChunkAgent = async (query, chunkText) => {
   `;
 
   try {
-    const response = await getGeminiResponse(prompt, "You are a helpful study assistant.", false);
+    const response = await getGeminiResponse("You are a helpful study assistant.", prompt, false);
     return { analysis: response, error: null };
   } catch (error) {
     console.error('Analyze Chunk Agent Error:', error);

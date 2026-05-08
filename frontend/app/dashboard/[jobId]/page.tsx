@@ -18,7 +18,6 @@ import {
   AlertCircle,
   RotateCcw,
   Sparkles,
-  MessageSquare,
   Volume2,
   VolumeX
 } from "lucide-react"
@@ -138,31 +137,6 @@ export default function DashboardPage() {
       console.error(err)
     } finally {
       setAnalyzingIndex(null)
-    }
-  }
-
-  const playStepVoice = async (step: number, stepVoices: Record<number, string>) => {
-    if (playedVoices.has(step)) return
-    
-    // Stop previous audio if playing
-    if (currentAudio) {
-      currentAudio.pause()
-      currentAudio.currentTime = 0
-    }
-
-    setPlayedVoices(prev => new Set(prev).add(step))
-    try {
-      const blob = await getAudio(stepVoices[step])
-      const url = URL.createObjectURL(blob)
-      const audio = new Audio(url)
-      setCurrentAudio(audio)
-      audio.play()
-      audio.onended = () => {
-        URL.revokeObjectURL(url)
-        setCurrentAudio(null)
-      }
-    } catch (err) {
-      console.error("Voice error:", err)
     }
   }
 

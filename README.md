@@ -38,9 +38,9 @@ graph TD
     FE -->|POST /tts| BE
     FE -->|POST /regenerate| BE
 
-    BE -->|Agent 1| YT[YouTube Transcript API]
+    BE -->|Agent 1| YT[RapidAPI Captions]
     BE -->|Agent 2, 3, 5| GM[Google Gemini 2.0 Flash]
-    BE -->|Agent 4 - Embed| EMB[Local Embeddings<br/>BGE-base-en-v1.5]
+    BE -->|Agent 4 - Embed| EMB[Gemini Embeddings<br/>gemini-embedding-001]
     BE -->|Upsert & Query| PC[Pinecone<br/>Serverless · 768d]
     BE -->|Voice Synthesis| EL[ElevenLabs TTS API]
 
@@ -67,11 +67,11 @@ graph TD
 | Frontend | Next.js 16 (App Router) | Duolingo-inspired UI with Fox mascot |
 | Backend | Express.js | Multi-agent orchestration & API |
 | LLM | Google Gemini 2.0 Flash | Content analysis & material generation |
-| Embeddings | BAAI/bge-base-en-v1.5 (local) | 768-dim vectors for semantic search |
+| Embeddings | Gemini Embeddings API (`gemini-embedding-001`) | 768-dim vectors for semantic search |
 | Vector DB | Pinecone (Serverless) | Namespace-isolated lecture indexing |
 | TTS | ElevenLabs | Fox mascot voice narration |
-| Transcript | youtube-transcript | Caption extraction with timestamps |
-| Styling | Tailwind CSS | Custom Duolingo design system |
+| Transcript | RapidAPI (WebVTT captions) | Caption extraction with timestamps |
+| Styling | Tailwind CSS v4 | Custom Duolingo design system |
 
 ---
 
@@ -91,8 +91,9 @@ graph TD
 
 ### Prerequisites
 - Node.js 18+
-- Pinecone account (free tier works)
 - Google Gemini API key
+- Pinecone account (free tier works)
+- RapidAPI key (for YouTube captions)
 - ElevenLabs API key (optional, for voice)
 
 ### Setup
@@ -116,6 +117,7 @@ cp backend/.env.example backend/.env
 GEMINI_API_KEY=your_gemini_key
 PINECONE_API_KEY=your_pinecone_key
 PINECONE_INDEX_NAME=lecture-ai
+X_RAPIDAPI_KEY=your_rapidapi_key
 FRONTEND_URL=http://localhost:3000
 PORT=3001
 ELEVENLABS_API_KEY=your_elevenlabs_key    # Optional
@@ -150,7 +152,7 @@ We modeled the UX after **Duolingo** — the most successful learning platform i
 
 ## Key Technical Decisions
 
-1. **Local Embeddings over Google API**: We use `BAAI/bge-base-en-v1.5` (768 dimensions) instead of Google's `text-embedding-004` to avoid API rate limits during development and judging. Both produce 768-dim vectors; the accuracy tradeoff is minimal for per-video scoped search.
+1. **Gemini Embeddings API**: We use Google's `gemini-embedding-001` model (768 dimensions) for vector generation. This keeps the stack unified under one API key and provides high-quality embeddings for per-video scoped search.
 
 2. **Pinecone Namespaces**: Each video gets its own namespace. Before indexing, we wipe the namespace clean. This guarantees zero data leakage between lectures.
 
@@ -184,7 +186,7 @@ LectureAI/
 │   │   ├── facultyAgent.js    # Analysis → audit report
 │   │   └── searchAgent.js     # Query → relevant moments
 │   ├── lib/
-│   │   ├── gemini.js          # Gemini + local embeddings
+│   │   ├── gemini.js          # Gemini LLM + embeddings API
 │   │   ├── pinecone.js        # Vector DB with namespaces
 │   │   ├── tts.js             # ElevenLabs TTS
 │   │   └── jobStore.js        # In-memory job state
