@@ -9,7 +9,7 @@ import {
   Play, 
   Loader2, 
   MessageCircle,
-  Compass
+  MapPin
 } from "lucide-react"
 
 interface Topic {
@@ -39,74 +39,100 @@ interface KnowledgeMapProps {
   jobId: string
 }
 
-const NODE_COLORS = [
-  { bg: "#1CB0F6", text: "#fff" },
-  { bg: "#58CC02", text: "#fff" },
-  { bg: "#FF9600", text: "#fff" },
-  { bg: "#CE82FF", text: "#fff" },
-  { bg: "#FF4B4B", text: "#fff" },
-  { bg: "#FFC800", text: "#3C3C3C" },
-  { bg: "#1899D6", text: "#fff" },
-  { bg: "#89E219", text: "#3C3C3C" },
+const LINE_COLORS = [
+  "#1CB0F6", // Blue
+  "#FF4B4B", // Red
+  "#58CC02", // Green
+  "#FF9600", // Orange
+  "#CE82FF", // Purple
+  "#FFC800", // Yellow
 ]
 
-interface NodePosition {
+interface Station {
   x: number
   y: number
-  radius: number
   topic: Topic
-  color: typeof NODE_COLORS[0]
+  lineIndex: number
 }
 
-function seededRandom(seed: number) {
-  const x = Math.sin(seed) * 10000
-  return x - Math.floor(x)
-}
+function buildMetroLayout(topics: Topic[], connections: TopicConnection[], width: number, height: number) {
+  if (topics.length === 0) return { stations: [] as Station[], lines: [] as { stations: Station[]; color: string; label: string }[] }
 
-function computeLayout(topics: Topic[], width: number, height: number): NodePosition[] {
-  if (topics.length === 0) return []
+  const sorted = [...topics].sort((a, b) => a.startTime - b.startTime)
+  const paddingX = 80
+  const paddingY = 60
+  const usableW = width - paddingX * 2
+  const usableH = height - paddingY * 2
 
-  const nodes: NodePosition[] = []
-  const padding = 70
-  const usableWidth = width - padding * 2
-  const usableHeight = height - padding * 2
+  // Assign topics to "lines" based on connections
+  // Main line = chronological order (always exists)
+  // Branch lines = groups of connected topics
+  const mainLineTopics = sorted
+  const branchLines: Topic[][] = []
 
-  const minRadius = 32
-  const maxRadius = 52
+  // Find clusters from connections
+  if (connections.length > 0) {
+    const connected = new Set<string>()
+    connections.forEach(c => {
+      connected.add(c.from)
+      connected.add(c.to)
+    })
 
-  // Calculate node sizes based on topic duration
-  const durations = topics.map(t => (t.endTime || 0) - (t.startTime || 0))
-  const maxDuration = Math.max(...durations, 1)
+    // Group connected topics into branches (up to 2 branch lines)
+    const visited = new Set<string>()
+    for (const conn of connections) {
+      if (visited.has(conn.from) && visited.has(conn.to)) continue
+      const branch: Topic[] = []
+      const fromTopic = sorted.find(t => t.id === conn.from)
+      const toTopic = sorted.find(t => t.id === conn.to)
+      if (fromTopic && !visited.has(fromTopic.id)) {
+        branch.push(fromTopic)
+        visited.add(fromTopic.id)
+      }
+      if (toTopic && !visited.has(toTopic.id)) {
+        branch.push(toTopic)
+        visited.add(toTopic.id)
+      }
+      if (branch.length > 0 && branchLines.length < 2) {
+        branchLines.push(branch)
+      }
+    }
+  }
 
-  // Place nodes using a force-relaxed grid with seeded randomness for determinism
-  const cols = Math.ceil(Math.sqrt(topics.length * (usableWidth / usableHeight)))
-  const rows = Math.ceil(topics.length / cols)
-  const cellW = usableWidth / cols
-  const cellH = usableHeight / rows
+  // Main line runs horizontally across the middle
+  const mainY = height / 2
+  const stationSpacing = usableW / Math.max(mainLineTopics.length - 1, 1)
 
-  topics.forEach((topic, i) => {
-    const col = i % cols
-    const row = Math.floor(i / cols)
-    const durationRatio = durations[i] / maxDuration
-    const radius = minRadius + (maxRadius - minRadius) * Math.max(durationRatio, 0.4)
+  const stations: Station[] = mainLineTopics.map((topic, i) => ({
+    x: paddingX + stationSpacing * i,
+    y: mainY,
+    topic,
+    lineIndex: 0
+  }))
 
-    // Deterministic scattered position within grid cell
-    const jitterX = (seededRandom(i * 7 + 3) - 0.5) * cellW * 0.5
-    const jitterY = (seededRandom(i * 13 + 7) - 0.5) * cellH * 0.4
-
-    const x = padding + cellW * (col + 0.5) + jitterX
-    const y = padding + cellH * (row + 0.5) + jitterY
-
-    nodes.push({
-      x: Math.max(padding + radius, Math.min(width - padding - radius, x)),
-      y: Math.max(padding + radius, Math.min(height - padding - radius, y)),
-      radius,
-      topic,
-      color: NODE_COLORS[i % NODE_COLORS.length]
+  // Branch lines run parallel above/below
+  const branchOffsetY = 80
+  branchLines.forEach((branch, branchIdx) => {
+    const yOffset = branchIdx === 0 ? -branchOffsetY : branchOffsetY
+    branch.forEach(topic => {
+      const mainStation = stations.find(s => s.topic.id === topic.id)
+      if (mainStation) {
+        mainStation.lineIndex = branchIdx + 1
+      }
     })
   })
 
-  return nodes
+  // Build line data for rendering
+  const lines = [
+    { stations: stations.filter(() => true), color: LINE_COLORS[0], label: "Main Flow" },
+    ...branchLines.map((branch, i) => ({
+      stations: stations.filter(s => branch.some(t => t.id === s.topic.id)),
+      color: LINE_COLORS[i + 1],
+      label: i === 0 ? "Key Concepts" : "Examples"
+    }))
+  ]
+
+  return { stations, lines }
 }
 
 export function KnowledgeMap({ topics, connections, videoId, jobId }: KnowledgeMapProps) {
@@ -114,7 +140,7 @@ export function KnowledgeMap({ topics, connections, videoId, jobId }: KnowledgeM
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [chatInput, setChatInput] = useState("")
   const [isSending, setIsSending] = useState(false)
-  const [dimensions, setDimensions] = useState({ width: 750, height: 500 })
+  const [dimensions, setDimensions] = useState({ width: 800, height: 420 })
   const chatEndRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -125,7 +151,7 @@ export function KnowledgeMap({ topics, connections, videoId, jobId }: KnowledgeM
       if (entry) {
         setDimensions({
           width: entry.contentRect.width,
-          height: Math.max(entry.contentRect.height, 480)
+          height: Math.max(entry.contentRect.height, 420)
         })
       }
     })
@@ -137,12 +163,10 @@ export function KnowledgeMap({ topics, connections, videoId, jobId }: KnowledgeM
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [chatMessages])
 
-  const nodes = useMemo(
-    () => computeLayout(topics, dimensions.width, dimensions.height),
-    [topics, dimensions.width, dimensions.height]
+  const { stations, lines } = useMemo(
+    () => buildMetroLayout(topics, connections, dimensions.width, dimensions.height),
+    [topics, connections, dimensions.width, dimensions.height]
   )
-
-  const getNodeById = (id: string) => nodes.find(n => n.topic.id === id)
 
   const handleNodeClick = (topic: Topic) => {
     setSelectedTopic(topic)
@@ -199,232 +223,279 @@ export function KnowledgeMap({ topics, connections, videoId, jobId }: KnowledgeM
   }
 
   return (
-    <div className="flex h-full gap-4">
-      {/* Map Area */}
-      <div className={`${selectedTopic ? 'w-3/5' : 'w-full'} transition-all duration-300`}>
-        <div ref={containerRef} className="w-full h-[500px] card-duo overflow-hidden relative bg-gradient-to-br from-white to-duo-surface/50">
-          {/* Header badge */}
-          <div className="absolute top-4 left-4 z-10 flex items-center gap-2 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full border border-duo-border shadow-sm">
-            <Compass className="w-4 h-4 text-duo-purple" />
-            <span className="text-xs font-bold text-duo-text-muted uppercase tracking-wider">Knowledge Map</span>
-          </div>
-
-          <svg
-            viewBox={`0 0 ${dimensions.width} ${dimensions.height}`}
-            className="w-full h-full"
-            style={{ minHeight: 480 }}
-          >
-            {/* Edges */}
-            {connections.map((conn, i) => {
-              const fromNode = getNodeById(conn.from)
-              const toNode = getNodeById(conn.to)
-              if (!fromNode || !toNode) return null
-
-              const isSelectedEdge =
-                selectedTopic?.id === conn.from || selectedTopic?.id === conn.to
-
-              // Curved path with slight offset for visual interest
-              const midX = (fromNode.x + toNode.x) / 2
-              const midY = (fromNode.y + toNode.y) / 2
-              const dx = toNode.x - fromNode.x
-              const dy = toNode.y - fromNode.y
-              const offset = 20 + (i % 3) * 10
-              const cpX = midX + (dy / Math.hypot(dx, dy)) * offset * (i % 2 === 0 ? 1 : -1)
-              const cpY = midY - (dx / Math.hypot(dx, dy)) * offset * (i % 2 === 0 ? 1 : -1)
-
-              return (
-                <path
-                  key={`edge-${i}`}
-                  d={`M ${fromNode.x} ${fromNode.y} Q ${cpX} ${cpY} ${toNode.x} ${toNode.y}`}
-                  fill="none"
-                  stroke={isSelectedEdge ? fromNode.color.bg : fromNode.color.bg}
-                  strokeWidth={isSelectedEdge ? 3 : 2}
-                  strokeOpacity={isSelectedEdge ? 0.8 : 0.25}
-                  className="transition-all duration-300"
-                />
-              )
-            })}
-
-            {/* Nodes */}
-            {nodes.map((node, i) => {
-              const isSelected = selectedTopic?.id === node.topic.id
-              const displayRadius = isSelected ? node.radius + 6 : node.radius
-              const title = node.topic.title
-              const maxChars = Math.floor(node.radius / 4.5)
-              const lines = title.length > maxChars
-                ? [title.slice(0, maxChars), title.slice(maxChars, maxChars * 2).trim() + (title.length > maxChars * 2 ? "…" : "")]
-                : [title]
-
-              return (
-                <g
-                  key={node.topic.id || i}
-                  className="cursor-pointer"
-                  onClick={() => handleNodeClick(node.topic)}
-                >
-                  {/* Selection glow */}
-                  {isSelected && (
-                    <circle
-                      cx={node.x}
-                      cy={node.y}
-                      r={displayRadius + 6}
-                      fill="none"
-                      stroke={node.color.bg}
-                      strokeWidth="3"
-                      strokeOpacity="0.4"
-                      className="animate-pulse"
-                    />
-                  )}
-
-                  {/* Shadow */}
-                  <circle
-                    cx={node.x}
-                    cy={node.y + 3}
-                    r={displayRadius}
-                    fill="black"
-                    fillOpacity="0.08"
-                  />
-
-                  {/* Main circle */}
-                  <circle
-                    cx={node.x}
-                    cy={node.y}
-                    r={displayRadius}
-                    fill={node.color.bg}
-                    className="transition-all duration-200"
-                  />
-
-                  {/* Label */}
-                  {lines.map((line, lineIdx) => (
-                    <text
-                      key={lineIdx}
-                      x={node.x}
-                      y={node.y + (lineIdx - (lines.length - 1) / 2) * 13}
-                      textAnchor="middle"
-                      dominantBaseline="central"
-                      fill={node.color.text}
-                      className="text-[11px] font-bold pointer-events-none select-none"
-                    >
-                      {line}
-                    </text>
-                  ))}
-                </g>
-              )
-            })}
-          </svg>
-
-          {/* Hint */}
-          {!selectedTopic && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-full border border-duo-border shadow-sm">
-              <span className="text-xs font-bold text-duo-text-muted">Click any topic to explore & chat</span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Chat Panel */}
-      {selectedTopic && (
-        <div className="w-2/5 min-w-[320px] flex flex-col card-duo overflow-hidden animate-fade-in">
-          {/* Panel Header */}
-          <div className="p-4 border-b border-duo-border bg-duo-surface/50">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <MessageCircle className="w-4 h-4 text-duo-green" />
-                <span className="text-xs font-bold uppercase tracking-wider text-duo-text-muted">Topic Chat</span>
+    <div className="flex flex-col h-full gap-4">
+      {/* Map + Chat side by side */}
+      <div className="flex gap-4 flex-1">
+        {/* Map Area */}
+        <div className={`${selectedTopic ? 'w-3/5' : 'w-full'} transition-all duration-300 flex flex-col`}>
+          <div ref={containerRef} className="flex-1 card-duo overflow-hidden relative bg-white min-h-[420px]">
+            {/* Legend */}
+            <div className="absolute top-4 left-4 z-10 bg-white/95 backdrop-blur-sm px-4 py-3 rounded-2xl border border-duo-border shadow-sm">
+              <div className="flex items-center gap-2 mb-2">
+                <MapPin className="w-3.5 h-3.5 text-duo-text-muted" />
+                <span className="text-[10px] font-black uppercase tracking-wider text-duo-text-muted">Lecture Route Map</span>
               </div>
-              <button
-                onClick={() => setSelectedTopic(null)}
-                className="p-1 rounded-full hover:bg-duo-border transition-colors"
-              >
-                <X className="w-4 h-4 text-duo-text-muted" />
-              </button>
-            </div>
-
-            <h3 className="font-bold text-duo-text text-sm">{selectedTopic.title}</h3>
-            <p className="text-xs text-duo-text-muted font-semibold mt-1 line-clamp-2">{selectedTopic.summary}</p>
-            
-            <div className="flex items-center gap-2 mt-2 flex-wrap">
-              <a
-                href={`https://www.youtube.com/watch?v=${videoId}&t=${Math.floor(selectedTopic.startTime)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-duo-green/10 text-duo-green text-[10px] font-bold hover:bg-duo-green hover:text-white transition-colors"
-              >
-                <Play className="w-3 h-3 fill-current" />
-                {formatTime(selectedTopic.startTime)}
-              </a>
-              {selectedTopic.keyTerms?.slice(0, 3).map((term, i) => (
-                <span key={i} className="px-2 py-0.5 rounded-full bg-duo-surface text-duo-text-muted text-[10px] font-bold border border-duo-border">
-                  {term}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          {/* Chat Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[200px] max-h-[280px]">
-            {chatMessages.length === 0 && (
-              <div className="flex flex-col items-center justify-center h-full text-center py-6">
-                <FoxMascot size="sm" expression="happy" />
-                <p className="text-duo-text-muted font-semibold text-xs mt-2">
-                  Ask me anything about "{selectedTopic.title}"
-                </p>
-              </div>
-            )}
-
-            {chatMessages.map((msg, i) => (
-              <div key={i} className={`flex gap-2 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                {msg.role === "assistant" && (
-                  <div className="flex-shrink-0 mt-1">
-                    <FoxMascot size="sm" expression="happy" animate={false} />
+              <div className="space-y-1.5">
+                {lines.map((line, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <div className="w-5 h-[4px] rounded-full" style={{ backgroundColor: line.color }} />
+                    <span className="text-[10px] font-bold text-duo-text">{line.label}</span>
                   </div>
-                )}
-                <div
-                  className={`max-w-[85%] px-3 py-2 rounded-2xl text-sm font-semibold ${
-                    msg.role === "user"
-                      ? "bg-duo-green text-white rounded-br-sm"
-                      : "bg-duo-surface text-duo-text rounded-bl-sm border border-duo-border"
-                  }`}
-                >
-                  {msg.content}
-                </div>
+                ))}
               </div>
-            ))}
+            </div>
 
-            {isSending && (
-              <div className="flex gap-2 justify-start">
-                <div className="flex-shrink-0 mt-1">
-                  <FoxMascot size="sm" expression="thinking" />
-                </div>
-                <div className="bg-duo-surface text-duo-text-muted rounded-2xl rounded-bl-sm px-3 py-2 border border-duo-border">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                </div>
+            {/* Time indicators */}
+            <div className="absolute bottom-3 left-20 right-20 flex justify-between pointer-events-none">
+              <span className="text-[10px] font-bold text-duo-text-muted bg-white/80 px-2 py-0.5 rounded">
+                {formatTime(topics[0]?.startTime || 0)}
+              </span>
+              <span className="text-[10px] font-bold text-duo-text-muted bg-white/80 px-2 py-0.5 rounded">
+                {formatTime(topics[topics.length - 1]?.endTime || 0)}
+              </span>
+            </div>
+
+            <svg
+              viewBox={`0 0 ${dimensions.width} ${dimensions.height}`}
+              className="w-full h-full"
+              style={{ minHeight: 420 }}
+            >
+              {/* Main track line (thick background) */}
+              {stations.length > 1 && (
+                <path
+                  d={`M ${stations[0].x} ${stations[0].y} ${stations.slice(1).map(s => `L ${s.x} ${s.y}`).join(' ')}`}
+                  fill="none"
+                  stroke={LINE_COLORS[0]}
+                  strokeWidth="8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  opacity="0.9"
+                />
+              )}
+
+              {/* Branch connection lines */}
+              {connections.map((conn, i) => {
+                const fromStation = stations.find(s => s.topic.id === conn.from)
+                const toStation = stations.find(s => s.topic.id === conn.to)
+                if (!fromStation || !toStation) return null
+
+                // Skip adjacent stations (already connected by main line)
+                const fromIdx = stations.indexOf(fromStation)
+                const toIdx = stations.indexOf(toStation)
+                if (Math.abs(fromIdx - toIdx) === 1) return null
+
+                const color = LINE_COLORS[(i % (LINE_COLORS.length - 1)) + 1]
+                const offsetY = i % 2 === 0 ? -50 - (i * 8) : 50 + (i * 8)
+                const midX = (fromStation.x + toStation.x) / 2
+
+                // Metro-style: go up/down at 45°, horizontal, then back at 45°
+                const diagLen = Math.abs(offsetY)
+                const path = `M ${fromStation.x} ${fromStation.y} 
+                  L ${fromStation.x + diagLen} ${fromStation.y + offsetY}
+                  L ${toStation.x - diagLen} ${toStation.y + offsetY}
+                  L ${toStation.x} ${toStation.y}`
+
+                return (
+                  <path
+                    key={`branch-${i}`}
+                    d={path}
+                    fill="none"
+                    stroke={color}
+                    strokeWidth="5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    opacity={selectedTopic && (selectedTopic.id === conn.from || selectedTopic.id === conn.to) ? 0.9 : 0.35}
+                    className="transition-opacity duration-300"
+                  />
+                )
+              })}
+
+              {/* Station nodes */}
+              {stations.map((station, i) => {
+                const isSelected = selectedTopic?.id === station.topic.id
+                const stationRadius = isSelected ? 14 : 11
+
+                return (
+                  <g
+                    key={station.topic.id || i}
+                    className="cursor-pointer"
+                    onClick={() => handleNodeClick(station.topic)}
+                  >
+                    {/* Outer ring */}
+                    <circle
+                      cx={station.x}
+                      cy={station.y}
+                      r={stationRadius + 3}
+                      fill="white"
+                      stroke={isSelected ? LINE_COLORS[0] : "#E5E5E5"}
+                      strokeWidth={isSelected ? 3 : 2}
+                      className="transition-all duration-200"
+                    />
+                    {/* Inner dot */}
+                    <circle
+                      cx={station.x}
+                      cy={station.y}
+                      r={stationRadius - 3}
+                      fill={isSelected ? LINE_COLORS[0] : LINE_COLORS[0]}
+                      opacity={isSelected ? 1 : 0.7}
+                      className="transition-all duration-200"
+                    />
+
+                    {/* Station label */}
+                    <text
+                      x={station.x}
+                      y={station.y + stationRadius + 18}
+                      textAnchor="middle"
+                      className={`text-[10px] font-bold ${isSelected ? 'fill-duo-text' : 'fill-duo-text-muted'}`}
+                    >
+                      {station.topic.title.length > 18
+                        ? station.topic.title.slice(0, 16) + "…"
+                        : station.topic.title}
+                    </text>
+
+                    {/* Timestamp below label */}
+                    <text
+                      x={station.x}
+                      y={station.y + stationRadius + 32}
+                      textAnchor="middle"
+                      className="text-[9px] font-semibold fill-duo-text-muted"
+                      opacity="0.6"
+                    >
+                      {formatTime(station.topic.startTime)}
+                    </text>
+
+                    {/* Selection indicator */}
+                    {isSelected && (
+                      <circle
+                        cx={station.x}
+                        cy={station.y}
+                        r={stationRadius + 8}
+                        fill="none"
+                        stroke={LINE_COLORS[0]}
+                        strokeWidth="2"
+                        opacity="0.4"
+                        className="animate-pulse"
+                      />
+                    )}
+                  </g>
+                )
+              })}
+            </svg>
+
+            {/* Hint */}
+            {!selectedTopic && (
+              <div className="absolute bottom-10 left-1/2 -translate-x-1/2 bg-white/95 backdrop-blur-sm px-4 py-2 rounded-full border border-duo-border shadow-sm">
+                <span className="text-xs font-bold text-duo-text-muted">Click any station to explore & chat with AI</span>
               </div>
             )}
-            <div ref={chatEndRef} />
           </div>
-
-          {/* Chat Input */}
-          <form onSubmit={handleSendMessage} className="p-3 border-t border-duo-border">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                placeholder="Ask about this topic..."
-                className="flex-1 rounded-full border-2 border-duo-border bg-white px-4 py-2 text-sm font-semibold text-duo-text placeholder:text-duo-text-muted focus:border-duo-green focus:outline-none"
-                disabled={isSending}
-              />
-              <button
-                type="submit"
-                disabled={isSending || !chatInput.trim()}
-                className="w-9 h-9 rounded-full bg-duo-green flex items-center justify-center text-white disabled:opacity-50 transition-all hover:-translate-y-0.5 active:translate-y-0"
-              >
-                <Send className="w-4 h-4" />
-              </button>
-            </div>
-          </form>
         </div>
-      )}
+
+        {/* Chat Panel */}
+        {selectedTopic && (
+          <div className="w-2/5 min-w-[320px] flex flex-col card-duo overflow-hidden animate-fade-in">
+            {/* Panel Header */}
+            <div className="p-4 border-b border-duo-border bg-duo-surface/50">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <MessageCircle className="w-4 h-4 text-duo-green" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-duo-text-muted">Station Chat</span>
+                </div>
+                <button
+                  onClick={() => setSelectedTopic(null)}
+                  className="p-1 rounded-full hover:bg-duo-border transition-colors"
+                >
+                  <X className="w-4 h-4 text-duo-text-muted" />
+                </button>
+              </div>
+
+              <h3 className="font-bold text-duo-text text-sm">{selectedTopic.title}</h3>
+              <p className="text-xs text-duo-text-muted font-semibold mt-1 line-clamp-2">{selectedTopic.summary}</p>
+              
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                <a
+                  href={`https://www.youtube.com/watch?v=${videoId}&t=${Math.floor(selectedTopic.startTime)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-duo-green/10 text-duo-green text-[10px] font-bold hover:bg-duo-green hover:text-white transition-colors"
+                >
+                  <Play className="w-3 h-3 fill-current" />
+                  Watch at {formatTime(selectedTopic.startTime)}
+                </a>
+                {selectedTopic.keyTerms?.slice(0, 3).map((term, i) => (
+                  <span key={i} className="px-2 py-0.5 rounded-full bg-duo-surface text-duo-text-muted text-[10px] font-bold border border-duo-border">
+                    {term}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Chat Messages */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[200px] max-h-[280px]">
+              {chatMessages.length === 0 && (
+                <div className="flex flex-col items-center justify-center h-full text-center py-6">
+                  <FoxMascot size="sm" expression="happy" />
+                  <p className="text-duo-text-muted font-semibold text-xs mt-2">
+                    Ask me anything about "{selectedTopic.title}"
+                  </p>
+                </div>
+              )}
+
+              {chatMessages.map((msg, i) => (
+                <div key={i} className={`flex gap-2 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                  {msg.role === "assistant" && (
+                    <div className="flex-shrink-0 mt-1">
+                      <FoxMascot size="sm" expression="happy" animate={false} />
+                    </div>
+                  )}
+                  <div
+                    className={`max-w-[85%] px-3 py-2 rounded-2xl text-sm font-semibold ${
+                      msg.role === "user"
+                        ? "bg-duo-green text-white rounded-br-sm"
+                        : "bg-duo-surface text-duo-text rounded-bl-sm border border-duo-border"
+                    }`}
+                  >
+                    {msg.content}
+                  </div>
+                </div>
+              ))}
+
+              {isSending && (
+                <div className="flex gap-2 justify-start">
+                  <div className="flex-shrink-0 mt-1">
+                    <FoxMascot size="sm" expression="thinking" />
+                  </div>
+                  <div className="bg-duo-surface text-duo-text-muted rounded-2xl rounded-bl-sm px-3 py-2 border border-duo-border">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  </div>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+
+            {/* Chat Input */}
+            <form onSubmit={handleSendMessage} className="p-3 border-t border-duo-border">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  placeholder="Ask about this topic..."
+                  className="flex-1 rounded-full border-2 border-duo-border bg-white px-4 py-2 text-sm font-semibold text-duo-text placeholder:text-duo-text-muted focus:border-duo-green focus:outline-none"
+                  disabled={isSending}
+                />
+                <button
+                  type="submit"
+                  disabled={isSending || !chatInput.trim()}
+                  className="w-9 h-9 rounded-full bg-duo-green flex items-center justify-center text-white disabled:opacity-50 transition-all hover:-translate-y-0.5 active:translate-y-0"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
