@@ -63,8 +63,16 @@ Return a JSON object with the following schema:
       "title": "string", 
       "startTime": number, 
       "endTime": number, 
-      "summary": "string", 
-      "keyTerms": ["string"] 
+      "summary": "string (2-3 sentences)", 
+      "keyTerms": ["string"],
+      "id": "topic_0, topic_1, etc."
+    }
+  ],
+  "topicConnections": [
+    {
+      "from": "topic_0",
+      "to": "topic_1",
+      "relationship": "string (e.g. 'builds on', 'contrasts with', 'provides example for', 'prerequisite for')"
     }
   ],
   "overallSummary": "string",
@@ -79,7 +87,9 @@ Return a JSON object with the following schema:
 
 RULES:
 1. Every topic MUST have a start and end time that matches the transcript markers.
-2. Be critical in the pedagogicalSignals. If the professor is rambling or confusing, reflect that in the scores.
+2. Every topic MUST have an id field (topic_0, topic_1, topic_2, etc.).
+3. topicConnections should identify meaningful relationships between topics (not just sequential order). Include 2-5 connections. Only connect topics that genuinely relate conceptually.
+4. Be critical in the pedagogicalSignals. If the professor is rambling or confusing, reflect that in the scores.
 `;
 
   try {

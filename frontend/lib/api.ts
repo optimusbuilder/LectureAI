@@ -69,3 +69,20 @@ export async function getAudio(text: string) {
   }
   return res.blob();
 }
+
+export async function chatWithTopic(
+  jobId: string,
+  message: string,
+  topicContext: { title: string; startTime: number; endTime: number; summary: string; keyTerms: string[] },
+  history: { role: 'user' | 'assistant'; content: string }[] = []
+) {
+  const res = await fetch(`${BACKEND}/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ jobId, message, topicContext, history })
+  });
+  if (!res.ok) {
+    throw new Error('Chat failed');
+  }
+  return res.json();
+}

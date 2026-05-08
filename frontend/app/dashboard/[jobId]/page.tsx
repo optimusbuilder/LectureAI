@@ -5,6 +5,7 @@ import { useParams } from "next/navigation"
 import Link from "next/link"
 import { FoxMascot } from "@/components/fox-mascot"
 import { pollJob, searchLecture, regenerateStudentMaterials, analyzeChunk, getAudio } from "@/lib/api"
+import { KnowledgeMap } from "@/components/knowledge-map"
 import { 
   Globe, 
   FileText, 
@@ -19,10 +20,11 @@ import {
   RotateCcw,
   Sparkles,
   Volume2,
-  VolumeX
+  VolumeX,
+  Compass
 } from "lucide-react"
 
-type Tab = "summary" | "flashcards" | "search"
+type Tab = "summary" | "flashcards" | "search" | "explore"
 type SummaryDepth = "short" | "medium" | "full"
 
 export default function DashboardPage() {
@@ -343,6 +345,17 @@ export default function DashboardPage() {
               <Search className="w-4 h-4" />
               Search
             </button>
+            <button
+              onClick={() => setActiveTab("explore")}
+              className={`flex items-center gap-2 px-5 py-2 rounded-full font-bold text-sm transition-all ${
+                activeTab === "explore"
+                  ? "bg-duo-purple text-white border-b-4 border-duo-purple-dark"
+                  : "bg-white text-duo-text border-2 border-duo-border border-b-4 hover:bg-duo-surface"
+              }`}
+            >
+              <Compass className="w-4 h-4" />
+              Explore
+            </button>
           </div>
         </div>
 
@@ -618,6 +631,21 @@ export default function DashboardPage() {
                   </p>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Explore Tab */}
+          {activeTab === "explore" && (
+            <div className="max-w-6xl mx-auto h-full">
+              <KnowledgeMap
+                topics={(data.intelligenceData?.topics || []).map((t: any, i: number) => ({
+                  ...t,
+                  id: t.id || `topic_${i}`
+                }))}
+                connections={data.intelligenceData?.topicConnections || []}
+                videoId={videoMeta.videoId}
+                jobId={jobId}
+              />
             </div>
           )}
         </div>

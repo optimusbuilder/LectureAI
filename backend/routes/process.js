@@ -55,8 +55,8 @@ async function processLecture(jobId, url, mode) {
 
     console.log(`[${jobId}] Intelligence complete in ${timing.intelligence}ms — ${intelligenceData.topics?.length || 0} topics, ${intelligenceData.chunks?.length || 0} chunks`);
 
-    // Cache intelligence data for language regeneration
-    await updateJob(jobId, { intelligenceData });
+    // Cache intelligence data + transcript for language regeneration and chat
+    await updateJob(jobId, { intelligenceData, fullTranscript: ingestionData.fullTranscript });
 
     // Step 3: Mode-specific Output
     let result;

@@ -9,6 +9,7 @@ import statusRouter from './routes/status.js';
 import searchRouter from './routes/search.js';
 import regenerateRouter from './routes/regenerate.js';
 import ttsRouter from './routes/tts.js';
+import chatRouter from './routes/chat.js';
 
 dotenv.config();
 
@@ -60,6 +61,7 @@ app.use('/status', statusRouter);
 app.use('/search', searchRouter);
 app.use('/regenerate', regenerateRouter);
 app.use('/tts', ttsRouter);
+app.use('/chat', chatRouter);
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
