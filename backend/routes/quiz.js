@@ -5,22 +5,22 @@ import { quizAgent } from '../agents/quizAgent.js';
 const router = express.Router();
 
 router.post('/', async (req, res) => {
-  const { jobId, topicId, language } = req.body;
+  const { jobId, topicId, language } = req.body || {};
 
   if (!jobId) {
     return res.status(400).json({ error: 'jobId is required' });
   }
 
-  const job = await getJob(jobId);
-  if (!job) {
-    return res.status(404).json({ error: 'Job not found' });
-  }
-
-  if (!job.intelligenceData || !job.fullTranscript) {
-    return res.status(400).json({ error: 'Lecture data is not ready for quiz generation' });
-  }
-
   try {
+    const job = await getJob(jobId);
+    if (!job) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+
+    if (!job.intelligenceData || !job.fullTranscript) {
+      return res.status(400).json({ error: 'Lecture data is not ready for quiz generation' });
+    }
+
     const result = await quizAgent({
       intelligenceData: job.intelligenceData,
       fullTranscript: job.fullTranscript,

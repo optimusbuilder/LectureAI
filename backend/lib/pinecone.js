@@ -4,11 +4,22 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const pc = new Pinecone({
-  apiKey: process.env.PINECONE_API_KEY
-});
+let index = null;
 
-const index = pc.index(process.env.PINECONE_INDEX_NAME || 'lecture-ai');
+const getIndex = () => {
+  if (!process.env.PINECONE_API_KEY) {
+    throw new Error('PINECONE_API_KEY is missing');
+  }
+
+  if (!index) {
+    const pc = new Pinecone({
+      apiKey: process.env.PINECONE_API_KEY
+    });
+    index = pc.index(process.env.PINECONE_INDEX_NAME || 'lecture-ai');
+  }
+
+  return index;
+};
 
 /**
  * Wipes all vectors for a specific video namespace
@@ -17,7 +28,7 @@ const index = pc.index(process.env.PINECONE_INDEX_NAME || 'lecture-ai');
 export const clearNamespace = async (videoId) => {
   try {
     console.log(`Wiping namespace for video ${videoId}...`);
-    const ns = index.namespace(videoId);
+    const ns = getIndex().namespace(videoId);
     await ns.deleteAll();
   } catch (error) {
     // If namespace doesn't exist, Pinecone might throw, which is fine
@@ -31,12 +42,16 @@ export const clearNamespace = async (videoId) => {
  * @param {Array} chunks 
  */
 export const upsertChunks = async (videoId, chunks) => {
+  if (!Array.isArray(chunks) || chunks.length === 0) {
+    throw new Error('NO_CHUNKS_TO_INDEX');
+  }
+
   // First, ensure a fresh slate for this video
   await clearNamespace(videoId);
   
   console.log(`Indexing ${chunks.length} chunks into namespace ${videoId}...`);
   
-  const ns = index.namespace(videoId);
+  const ns = getIndex().namespace(videoId);
   const vectors = [];
   
   for (const chunk of chunks) {
@@ -72,7 +87,7 @@ export const upsertChunks = async (videoId, chunks) => {
  */
 export const searchChunks = async (videoId, query, topK = 3) => {
   const queryVector = await getEmbedding(query, 'RETRIEVAL_QUERY');
-  const ns = index.namespace(videoId);
+  const ns = getIndex().namespace(videoId);
   
   const queryResponse = await ns.query({
     vector: queryVector,

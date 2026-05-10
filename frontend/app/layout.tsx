@@ -1,13 +1,6 @@
 import type { Metadata } from 'next'
-import { Nunito } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
-
-const nunito = Nunito({ 
-  subsets: ["latin"],
-  weight: ["400", "600", "700", "800", "900"],
-  variable: "--font-nunito"
-})
 
 export const metadata: Metadata = {
   title: 'LectureAI - Learn Smarter, Not Harder',
@@ -39,7 +32,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="bg-white">
-      <body className={`${nunito.className} font-sans antialiased`}>
+      <body className="font-sans antialiased">
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>

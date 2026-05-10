@@ -4,7 +4,7 @@ import { generateTTS } from '../lib/tts.js';
 const router = express.Router();
 
 router.post('/', async (req, res) => {
-  const { text } = req.body;
+  const { text } = req.body || {};
 
   if (!text) {
     return res.status(400).json({ error: 'Text is required' });

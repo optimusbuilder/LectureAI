@@ -10,22 +10,22 @@ const router = express.Router();
  * Returns the new student materials directly (not async/polling).
  */
 router.post('/', async (req, res) => {
-  const { jobId, language } = req.body;
+  const { jobId, language } = req.body || {};
 
   if (!jobId || !language) {
     return res.status(400).json({ error: 'jobId and language are required' });
   }
 
-  const job = await getJob(jobId);
-  if (!job) {
-    return res.status(404).json({ error: 'Job not found' });
-  }
-
-  if (!job.intelligenceData) {
-    return res.status(400).json({ error: 'No intelligence data available for this job. Process the lecture first.' });
-  }
-
   try {
+    const job = await getJob(jobId);
+    if (!job) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+
+    if (!job.intelligenceData) {
+      return res.status(400).json({ error: 'No intelligence data available for this job. Process the lecture first.' });
+    }
+
     const result = await studentAgent(job.intelligenceData, language);
 
     if (result.error) {

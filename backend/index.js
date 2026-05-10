@@ -11,6 +11,7 @@ import regenerateRouter from './routes/regenerate.js';
 import ttsRouter from './routes/tts.js';
 import chatRouter from './routes/chat.js';
 import quizRouter from './routes/quiz.js';
+import provostRouter from './routes/provost.js';
 
 dotenv.config();
 
@@ -64,6 +65,7 @@ app.use('/regenerate', regenerateRouter);
 app.use('/tts', ttsRouter);
 app.use('/chat', chatRouter);
 app.use('/quiz', quizRouter);
+app.use('/provost', provostRouter);
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

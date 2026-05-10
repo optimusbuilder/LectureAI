@@ -11,19 +11,29 @@ const processLimiter = rateLimit({
 });
 
 router.post('/', processLimiter, async (req, res) => {
-  const { youtubeUrl, mode } = req.body;
+  const { youtubeUrl, mode } = req.body || {};
+  const normalizedMode = mode || 'student';
 
   if (!youtubeUrl) {
     return res.status(400).json({ error: 'YouTube URL is required' });
   }
 
-  const jobId = generateJobId();
-  await createJob(jobId, mode || 'student');
+  if (!['student', 'faculty'].includes(normalizedMode)) {
+    return res.status(400).json({ error: 'Mode must be either student or faculty' });
+  }
 
-  // Start processing async (not awaited — returns immediately)
-  processLecture(jobId, youtubeUrl, mode || 'student');
+  try {
+    const jobId = generateJobId();
+    await createJob(jobId, normalizedMode);
 
-  res.json({ jobId, status: 'processing' });
+    // Start processing async (not awaited — returns immediately)
+    processLecture(jobId, youtubeUrl, normalizedMode);
+
+    res.json({ jobId, status: 'processing' });
+  } catch (error) {
+    console.error('Failed to create processing job:', error);
+    res.status(500).json({ error: 'JOB_CREATE_FAILED', message: 'Failed to start processing job' });
+  }
 });
 
 import { ingestionAgent } from '../agents/ingestionAgent.js';

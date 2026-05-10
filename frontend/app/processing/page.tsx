@@ -110,10 +110,13 @@ function ProcessingContent() {
             "Analyzing lecture content...": 1,
             "Building your study materials...": 2,
             "Generating faculty report...": 2,
+            "Mapping curriculum coverage...": 2,
             "Indexing for semantic search...": 3,
           }
 
-          const stepIndex = stepMap[job.step]
+          const stepIndex = typeof job.step === "string" && job.step.startsWith("Processing lecture")
+            ? 1
+            : stepMap[job.step]
           if (stepIndex !== undefined) {
             setCurrentStep(stepIndex + 1)
             setProgress(25 + stepIndex * 25)
@@ -141,6 +144,8 @@ function ProcessingContent() {
   const handleViewResults = () => {
     if (jobMode === "faculty") {
       router.push(`/audit/${jobId}`)
+    } else if (jobMode === "provost") {
+      router.push(`/provost/${jobId}`)
     } else {
       router.push(`/dashboard/${jobId}`)
     }
