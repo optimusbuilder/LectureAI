@@ -773,6 +773,17 @@ export default function DashboardPage() {
                                 <MarkdownContent className="text-sm font-semibold leading-relaxed text-duo-text">
                                   {question.explanation}
                                 </MarkdownContent>
+                                {question.youtubeLink && (
+                                  <a
+                                    href={question.youtubeLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-xs font-black text-duo-blue border border-duo-blue/20 hover:bg-duo-blue hover:text-white"
+                                  >
+                                    <Play className="w-3 h-3 fill-current" />
+                                    Review source at {formatTime(question.timestamp)}
+                                  </a>
+                                )}
                               </div>
                             )}
                           </div>

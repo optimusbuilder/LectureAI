@@ -46,6 +46,27 @@ function truncateLabel(label: string, max = 26) {
   return label.length > max ? `${label.slice(0, max - 1)}...` : label
 }
 
+function splitLabel(label: string, maxLineLength = 20) {
+  const words = label.split(/\s+/).filter(Boolean)
+  const lines: string[] = []
+  let current = ""
+
+  words.forEach(word => {
+    const next = current ? `${current} ${word}` : word
+    if (next.length > maxLineLength && current) {
+      lines.push(current)
+      current = word
+    } else {
+      current = next
+    }
+  })
+
+  if (current) lines.push(current)
+
+  if (lines.length <= 2) return lines
+  return [lines[0], truncateLabel(lines.slice(1).join(" "), maxLineLength + 2)]
+}
+
 export function KnowledgeMap({ topics, connections, videoId, jobId }: KnowledgeMapProps) {
   const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null)
   const [hoveredId, setHoveredId] = useState<string | null>(null)
@@ -72,11 +93,11 @@ export function KnowledgeMap({ topics, connections, videoId, jobId }: KnowledgeM
   }, [connections])
 
   const mapData = useMemo(() => {
-    const stationGap = 150
-    const rowGap = 150
-    const left = 130
-    const top = 150
-    const cols = Math.max(3, Math.min(5, Math.ceil(Math.sqrt(sortedTopics.length + 2))))
+    const stationGap = 220
+    const rowGap = 210
+    const left = 170
+    const top = 260
+    const cols = Math.max(3, Math.min(4, Math.ceil(Math.sqrt(sortedTopics.length + 2))))
     const rows = Math.max(1, Math.ceil(sortedTopics.length / cols))
 
     const stations = sortedTopics.map((topic, index) => {
@@ -101,9 +122,9 @@ export function KnowledgeMap({ topics, connections, videoId, jobId }: KnowledgeM
       }
     })
 
-    const width = Math.max(880, left * 2 + (cols - 1) * stationGap + 160)
-    const height = Math.max(560, top + (rows - 1) * rowGap + 180)
-    return { stations, width, height, cols, rows }
+    const width = Math.max(1040, left * 2 + (cols - 1) * stationGap + 300)
+    const height = Math.max(660, top + (rows - 1) * rowGap + 230)
+    return { stations, width, height, cols, rows, top, rowGap }
   }, [connectedTopicIds, sortedTopics])
 
   const stationById = useMemo(() => {
@@ -240,17 +261,17 @@ export function KnowledgeMap({ topics, connections, videoId, jobId }: KnowledgeM
             {Array.from({ length: mapData.rows }).map((_, row) => (
               <g key={`district-${row}`}>
                 <rect
-                  x={70 + (row % 2) * 40}
-                  y={88 + row * 150}
-                  width={Math.min(520, mapData.width - 160)}
-                  height="88"
+                  x={96 + (row % 2) * 52}
+                  y={mapData.top - 82 + row * mapData.rowGap}
+                  width={Math.min(700, mapData.width - 220)}
+                  height="118"
                   rx="8"
                   fill={DISTRICT_COLORS[row % DISTRICT_COLORS.length]}
                   opacity="0.45"
                 />
                 <text
-                  x={92 + (row % 2) * 40}
-                  y={112 + row * 150}
+                  x={122 + (row % 2) * 52}
+                  y={mapData.top - 52 + row * mapData.rowGap}
                   fontSize="12"
                   fontWeight="900"
                   fill="#7A8778"
@@ -317,6 +338,16 @@ export function KnowledgeMap({ topics, connections, videoId, jobId }: KnowledgeM
                 )
               )
               const ring = station.isHub ? 19 : 14
+              const labelLines = splitLabel(station.topic.title)
+              const labelWidth = 172
+              const labelHeight = labelLines.length > 1 ? 54 : 40
+              const labelYOffset = station.row % 2 === 0 ? -86 : 52
+              const labelXOffset = station.col === 0
+                ? 20
+                : station.col === mapData.cols - 1
+                  ? -labelWidth - 20
+                  : -labelWidth / 2
+              const labelYOffsetText = labelLines.length > 1 ? 18 : 24
 
               return (
                 <g
@@ -327,35 +358,56 @@ export function KnowledgeMap({ topics, connections, videoId, jobId }: KnowledgeM
                   onMouseLeave={() => setHoveredId(null)}
                   className="cursor-pointer"
                 >
-                  {(isSelected || isHovered || isConnected) && (
-                    <circle r={ring + 9} fill={station.color} opacity="0.16" className="animate-pulse" />
-                  )}
-                  <circle r={ring} fill="white" stroke="#111827" strokeWidth={station.isHub ? 4 : 3} />
-                  <circle r={station.isHub ? 8 : 6} fill={isSelected ? station.color : "#FFFFFF"} stroke={station.color} strokeWidth="4" />
-                  {station.isHub && <circle r="25" fill="none" stroke="#111827" strokeWidth="2" opacity="0.8" />}
-
-                  <g transform={`translate(16, -22) rotate(${station.row % 2 === 0 ? -28 : 28})`}>
+                  <line
+                    x1="0"
+                    y1={labelYOffset > 0 ? ring + 8 : -ring - 8}
+                    x2={labelXOffset + labelWidth / 2}
+                    y2={labelYOffset > 0 ? labelYOffset + 2 : labelYOffset + labelHeight - 2}
+                    stroke="#D1D5DB"
+                    strokeWidth="2"
+                    strokeDasharray="3 4"
+                    opacity="0.8"
+                  />
+                  <g transform={`translate(${labelXOffset}, ${labelYOffset})`}>
+                    <rect
+                      width={labelWidth}
+                      height={labelHeight}
+                      rx="10"
+                      fill="white"
+                      stroke={isSelected ? station.color : "#E5E5E5"}
+                      strokeWidth={isSelected ? 2.5 : 1.5}
+                      opacity="0.97"
+                    />
+                    {labelLines.map((line, index) => (
+                      <text
+                        key={line}
+                        x="12"
+                        y={labelYOffsetText + index * 15}
+                        fontSize="11"
+                        fontWeight="900"
+                        fill={isSelected ? station.color : "#3C3C3C"}
+                        className="select-none"
+                      >
+                        {line}
+                      </text>
+                    ))}
                     <text
-                      x="0"
-                      y="0"
-                      fontSize="12"
+                      x="12"
+                      y={labelHeight - 8}
+                      fontSize="9"
                       fontWeight="900"
-                      fill={isSelected ? station.color : "#3C3C3C"}
-                      className="select-none"
-                    >
-                      {truncateLabel(station.topic.title)}
-                    </text>
-                    <text
-                      x="0"
-                      y="16"
-                      fontSize="10"
-                      fontWeight="800"
                       fill="#8A8A8A"
                       className="select-none"
                     >
                       {formatTime(station.topic.startTime)}
                     </text>
                   </g>
+                  {(isSelected || isHovered || isConnected) && (
+                    <circle r={ring + 9} fill={station.color} opacity="0.16" className="animate-pulse" />
+                  )}
+                  <circle r={ring} fill="white" stroke="#111827" strokeWidth={station.isHub ? 4 : 3} />
+                  <circle r={station.isHub ? 8 : 6} fill={isSelected ? station.color : "#FFFFFF"} stroke={station.color} strokeWidth="4" />
+                  {station.isHub && <circle r="25" fill="none" stroke="#111827" strokeWidth="2" opacity="0.8" />}
                 </g>
               )
             })}
@@ -459,10 +511,10 @@ export function KnowledgeMap({ topics, connections, videoId, jobId }: KnowledgeM
             </form>
           </>
         ) : (
-          <div className="flex h-full flex-col items-center justify-center p-8 text-center">
-            <FoxMascot size="lg" expression="studying" />
-            <h3 className="mt-5 text-xl font-black text-duo-text">Pick a station</h3>
-            <p className="mt-2 text-sm font-semibold leading-relaxed text-duo-text-muted">
+          <div className="flex h-full flex-col items-center justify-center gap-4 overflow-y-auto p-8 text-center">
+            <FoxMascot size="md" expression="studying" />
+            <h3 className="text-xl font-black text-duo-text">Pick a station</h3>
+            <p className="max-w-[260px] text-sm font-semibold leading-relaxed text-duo-text-muted">
               Click any stop to inspect the topic, jump to the lecture, and chat about that section.
             </p>
           </div>
