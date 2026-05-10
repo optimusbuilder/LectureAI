@@ -351,6 +351,18 @@
   animation: fadeInUp 0.5s ease-out forwards;
 }
 
+.markdown-content {
+  color: var(--duo-text);
+}
+
+.markdown-content > :first-child {
+  margin-top: 0;
+}
+
+.markdown-content > :last-child {
+  margin-bottom: 0;
+}
+
 .animation-delay-100 {
   animation-delay: 100ms;
 }

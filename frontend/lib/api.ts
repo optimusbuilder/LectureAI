@@ -70,6 +70,19 @@ export async function getAudio(text: string) {
   return res.blob();
 }
 
+export async function generateQuiz(jobId: string, topicId: string = 'all', language: string = 'en') {
+  const res = await fetch(`${BACKEND}/quiz`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ jobId, topicId, language })
+  });
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.message || 'Failed to generate quiz');
+  }
+  return res.json();
+}
+
 export async function chatWithTopic(
   jobId: string,
   message: string,

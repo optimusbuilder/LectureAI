@@ -4,8 +4,9 @@ import { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
 import { FoxMascot } from "@/components/fox-mascot"
-import { pollJob, searchLecture, regenerateStudentMaterials, analyzeChunk, getAudio } from "@/lib/api"
+import { pollJob, searchLecture, regenerateStudentMaterials, analyzeChunk, getAudio, generateQuiz } from "@/lib/api"
 import { KnowledgeMap } from "@/components/knowledge-map"
+import { MarkdownContent } from "@/components/markdown-content"
 import { 
   Globe, 
   FileText, 
@@ -21,11 +22,31 @@ import {
   Sparkles,
   Volume2,
   VolumeX,
-  Compass
+  Compass,
+  ClipboardCheck,
+  CheckCircle2,
+  XCircle,
+  Trophy
 } from "lucide-react"
 
-type Tab = "summary" | "flashcards" | "search" | "explore"
+type Tab = "summary" | "flashcards" | "quiz" | "search" | "explore"
 type SummaryDepth = "short" | "medium" | "full"
+
+interface QuizQuestion {
+  question: string
+  choices: string[]
+  answerIndex: number
+  explanation: string
+  timestamp: number
+  youtubeLink?: string
+}
+
+interface QuizData {
+  title: string
+  scope: string
+  questions: QuizQuestion[]
+  language: string
+}
 
 export default function DashboardPage() {
   const params = useParams()
@@ -50,6 +71,11 @@ export default function DashboardPage() {
   const [analyzingIndex, setAnalyzingIndex] = useState<number | null>(null)
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null)
   const [audioLoadingId, setAudioLoadingId] = useState<string | null>(null)
+  const [quizTopicId, setQuizTopicId] = useState("all")
+  const [quiz, setQuiz] = useState<QuizData | null>(null)
+  const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false)
+  const [quizAnswers, setQuizAnswers] = useState<Record<number, number>>({})
+  const [quizSubmitted, setQuizSubmitted] = useState(false)
 
   // Fetch data from backend
   useEffect(() => {
@@ -106,6 +132,9 @@ export default function DashboardPage() {
       setData((prev: any) => ({ ...prev, result: newResult }))
       setCurrentCard(0)
       setIsFlipped(false)
+      setQuiz(null)
+      setQuizAnswers({})
+      setQuizSubmitted(false)
     } catch (err) {
       console.error("Language regeneration failed:", err)
       setLanguage(language)
@@ -167,6 +196,32 @@ export default function DashboardPage() {
       setAudioLoadingId(null)
     }
   }
+
+  const handleGenerateQuiz = async () => {
+    if (!data || isGeneratingQuiz) return
+    setIsGeneratingQuiz(true)
+    setQuizSubmitted(false)
+    setQuizAnswers({})
+    try {
+      const nextQuiz = await generateQuiz(jobId, quizTopicId, language)
+      setQuiz(nextQuiz)
+    } catch (err) {
+      console.error("Quiz generation failed:", err)
+    } finally {
+      setIsGeneratingQuiz(false)
+    }
+  }
+
+  const handleQuizAnswer = (questionIndex: number, choiceIndex: number) => {
+    if (quizSubmitted) return
+    setQuizAnswers(prev => ({ ...prev, [questionIndex]: choiceIndex }))
+  }
+
+  const quizScore = quiz
+    ? quiz.questions.reduce((score, question, index) => (
+      quizAnswers[index] === question.answerIndex ? score + 1 : score
+    ), 0)
+    : 0
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
@@ -335,6 +390,17 @@ export default function DashboardPage() {
               Flashcards
             </button>
             <button
+              onClick={() => setActiveTab("quiz")}
+              className={`flex items-center gap-2 px-5 py-2 rounded-full font-bold text-sm transition-all ${
+                activeTab === "quiz"
+                  ? "bg-duo-orange text-white border-b-4 border-duo-orange-dark"
+                  : "bg-white text-duo-text border-2 border-duo-border border-b-4 hover:bg-duo-surface"
+              }`}
+            >
+              <ClipboardCheck className="w-4 h-4" />
+              Quiz
+            </button>
+            <button
               onClick={() => setActiveTab("search")}
               className={`flex items-center gap-2 px-5 py-2 rounded-full font-bold text-sm transition-all ${
                 activeTab === "search"
@@ -401,7 +467,7 @@ export default function DashboardPage() {
 
               <div className="prose prose-xl max-w-none">
                 <div className="text-duo-text font-bold text-lg md:text-xl leading-relaxed whitespace-pre-line bg-duo-surface/50 p-8 rounded-3xl border-2 border-duo-border/50">
-                  {summaries[summaryDepth]}
+                  <MarkdownContent>{summaries[summaryDepth]}</MarkdownContent>
                 </div>
               </div>
             </div>
@@ -430,9 +496,9 @@ export default function DashboardPage() {
                       Critical Question
                     </span>
                     <div className="flex-1 flex items-center justify-center overflow-y-auto custom-scrollbar pr-2">
-                      <p className="text-2xl md:text-3xl lg:text-4xl font-black text-duo-text text-center leading-tight">
+                      <MarkdownContent className="text-center text-2xl md:text-3xl lg:text-4xl font-black leading-tight">
                         {flashcards[currentCard].front}
-                      </p>
+                      </MarkdownContent>
                     </div>
                     <div className="flex items-center justify-center gap-2 text-duo-text-muted font-bold mt-4 flex-shrink-0">
                       <span className="animate-bounce">👇</span>
@@ -446,9 +512,9 @@ export default function DashboardPage() {
                       Expert Answer
                     </span>
                     <div className="flex-1 flex items-center justify-center">
-                      <p className="text-2xl md:text-3xl font-bold text-duo-text text-center leading-relaxed">
+                      <MarkdownContent className="text-center text-2xl md:text-3xl font-bold leading-relaxed">
                         {flashcards[currentCard].back}
-                      </p>
+                      </MarkdownContent>
                     </div>
                     <div className="flex flex-col items-center gap-4 mt-8">
                       <a
@@ -521,6 +587,204 @@ export default function DashboardPage() {
             </div>
           )}
 
+          {/* Quiz Tab */}
+          {activeTab === "quiz" && (
+            <div className="max-w-5xl mx-auto">
+              <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6">
+                <aside className="space-y-4">
+                  <div className="card-duo p-5 border-b-4 border-duo-orange">
+                    <div className="w-12 h-12 rounded-full bg-duo-orange flex items-center justify-center mb-4">
+                      <ClipboardCheck className="w-6 h-6 text-white" />
+                    </div>
+                    <h2 className="text-xl font-black text-duo-text mb-2">Quiz Yourself</h2>
+                    <p className="text-sm font-semibold text-duo-text-muted leading-relaxed">
+                      Generate 10 fresh questions from the whole lecture or one topic, then submit for instant scoring.
+                    </p>
+                  </div>
+
+                  <div className="card-duo p-5 space-y-4">
+                    <div>
+                      <label className="text-xs font-black uppercase tracking-wider text-duo-text-muted">
+                        Scope
+                      </label>
+                      <select
+                        value={quizTopicId}
+                        onChange={(e) => {
+                          setQuizTopicId(e.target.value)
+                          setQuiz(null)
+                          setQuizAnswers({})
+                          setQuizSubmitted(false)
+                        }}
+                        disabled={isGeneratingQuiz}
+                        className="mt-2 w-full rounded-xl border-2 border-duo-border bg-white px-3 py-2 text-sm font-bold text-duo-text focus:border-duo-orange focus:outline-none disabled:opacity-50"
+                      >
+                        <option value="all">Whole lecture</option>
+                        {(data.intelligenceData?.topics || []).map((topic: any, index: number) => (
+                          <option key={topic.id || index} value={topic.id || `topic_${index}`}>
+                            {topic.title}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <button
+                      onClick={handleGenerateQuiz}
+                      disabled={isGeneratingQuiz}
+                      className="w-full flex items-center justify-center gap-2 rounded-full bg-duo-orange px-6 py-3 text-sm font-black uppercase tracking-wider text-white border-b-4 border-duo-orange-dark transition-all hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50"
+                    >
+                      {isGeneratingQuiz ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                      {quiz ? "Generate New Quiz" : "Generate Quiz"}
+                    </button>
+
+                    {quiz && (
+                      <div className="rounded-2xl bg-duo-surface p-4">
+                        <div className="flex items-center gap-3">
+                          <Trophy className="w-5 h-5 text-duo-yellow" />
+                          <div>
+                            <p className="text-xs font-black uppercase tracking-wider text-duo-text-muted">Score</p>
+                            <p className="text-lg font-black text-duo-text">
+                              {quizSubmitted ? `${quizScore}/${quiz.questions.length}` : `${Object.keys(quizAnswers).length}/${quiz.questions.length} answered`}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </aside>
+
+                <section>
+                  {!quiz && !isGeneratingQuiz && (
+                    <div className="card-duo min-h-[420px] flex flex-col items-center justify-center text-center p-10">
+                      <FoxMascot size="lg" expression="studying" />
+                      <h3 className="mt-6 text-2xl font-black text-duo-text">Ready when you are</h3>
+                      <p className="mt-2 max-w-md text-sm font-semibold text-duo-text-muted">
+                        Pick a scope and generate a 10-question quiz based on the lecture content.
+                      </p>
+                    </div>
+                  )}
+
+                  {isGeneratingQuiz && (
+                    <div className="card-duo min-h-[420px] flex flex-col items-center justify-center text-center p-10">
+                      <Loader2 className="w-10 h-10 animate-spin text-duo-orange mb-4" />
+                      <h3 className="text-2xl font-black text-duo-text">Writing your quiz...</h3>
+                      <p className="mt-2 text-sm font-semibold text-duo-text-muted">
+                        Building fresh questions from the transcript.
+                      </p>
+                    </div>
+                  )}
+
+                  {quiz && !isGeneratingQuiz && (
+                    <div className="space-y-5">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                        <div>
+                          <h3 className="text-2xl font-black text-duo-text">{quiz.title}</h3>
+                          <p className="text-sm font-bold text-duo-text-muted">{quiz.scope}</p>
+                        </div>
+                        <button
+                          onClick={() => setQuizSubmitted(true)}
+                          disabled={Object.keys(quizAnswers).length < quiz.questions.length || quizSubmitted}
+                          className="rounded-full bg-duo-green px-6 py-3 text-sm font-black uppercase tracking-wider text-white border-b-4 border-duo-green-dark transition-all hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50"
+                        >
+                          {quizSubmitted ? `Scored ${quizScore}/${quiz.questions.length}` : "Submit Quiz"}
+                        </button>
+                      </div>
+
+                      {quiz.questions.map((question, questionIndex) => {
+                        const selected = quizAnswers[questionIndex]
+                        const isCorrect = selected === question.answerIndex
+                        return (
+                          <div key={questionIndex} className="card-duo p-5">
+                            <div className="flex items-start gap-4 mb-4">
+                              <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-duo-orange text-sm font-black text-white">
+                                {questionIndex + 1}
+                              </span>
+                              <div className="flex-1">
+                                <MarkdownContent className="text-lg font-black leading-snug text-duo-text">
+                                  {question.question}
+                                </MarkdownContent>
+                                {question.youtubeLink && (
+                                  <a
+                                    href={question.youtubeLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-duo-blue/10 px-3 py-1 text-xs font-black text-duo-blue hover:bg-duo-blue hover:text-white"
+                                  >
+                                    <Play className="w-3 h-3 fill-current" />
+                                    {formatTime(question.timestamp)}
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {question.choices.map((choice, choiceIndex) => {
+                                const isSelected = selected === choiceIndex
+                                const isAnswer = question.answerIndex === choiceIndex
+                                const resultClass = quizSubmitted
+                                  ? isAnswer
+                                    ? "border-duo-green bg-duo-green/10"
+                                    : isSelected
+                                      ? "border-duo-red bg-duo-red/10"
+                                      : "border-duo-border bg-white"
+                                  : isSelected
+                                    ? "border-duo-orange bg-duo-orange/10"
+                                    : "border-duo-border bg-white hover:bg-duo-surface"
+
+                                return (
+                                  <button
+                                    key={choiceIndex}
+                                    onClick={() => handleQuizAnswer(questionIndex, choiceIndex)}
+                                    disabled={quizSubmitted}
+                                    className={`flex items-start gap-3 rounded-2xl border-2 p-4 text-left transition-all ${resultClass}`}
+                                  >
+                                    <span className={`mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-xs font-black ${
+                                      quizSubmitted && isAnswer
+                                        ? "bg-duo-green text-white"
+                                        : quizSubmitted && isSelected && !isAnswer
+                                          ? "bg-duo-red text-white"
+                                          : isSelected
+                                            ? "bg-duo-orange text-white"
+                                            : "bg-duo-surface text-duo-text-muted"
+                                    }`}>
+                                      {String.fromCharCode(65 + choiceIndex)}
+                                    </span>
+                                    <MarkdownContent className="text-sm font-bold leading-relaxed text-duo-text">
+                                      {choice}
+                                    </MarkdownContent>
+                                  </button>
+                                )
+                              })}
+                            </div>
+
+                            {quizSubmitted && (
+                              <div className={`mt-4 rounded-2xl border-2 p-4 ${
+                                isCorrect ? "border-duo-green/30 bg-duo-green/5" : "border-duo-red/30 bg-duo-red/5"
+                              }`}>
+                                <div className="mb-2 flex items-center gap-2">
+                                  {isCorrect ? (
+                                    <CheckCircle2 className="w-5 h-5 text-duo-green" />
+                                  ) : (
+                                    <XCircle className="w-5 h-5 text-duo-red" />
+                                  )}
+                                  <span className="text-sm font-black text-duo-text">
+                                    {isCorrect ? "Correct" : "Review this one"}
+                                  </span>
+                                </div>
+                                <MarkdownContent className="text-sm font-semibold leading-relaxed text-duo-text">
+                                  {question.explanation}
+                                </MarkdownContent>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </section>
+              </div>
+            </div>
+          )}
+
           {/* Search Tab */}
           {activeTab === "search" && (
             <div className="max-w-4xl mx-auto">
@@ -566,9 +830,9 @@ export default function DashboardPage() {
                           >
                             {formatTime(result.startTime)}
                           </a>
-                          <p className="text-duo-text font-semibold text-sm flex-1">
+                          <MarkdownContent className="text-duo-text font-semibold text-sm flex-1">
                             {result.text}
-                          </p>
+                          </MarkdownContent>
                           
                           {!analyses[index] && (
                             <button
@@ -595,9 +859,9 @@ export default function DashboardPage() {
                           <div className="flex-1 bg-duo-surface rounded-2xl rounded-tl-none p-4 border-2 border-duo-border relative">
                             {/* Speech bubble tail */}
                             <div className="absolute -left-2 top-0 w-2 h-2 bg-duo-surface border-l-2 border-t-2 border-duo-border -translate-x-0.5" />
-                            <p className="text-sm font-semibold text-duo-text leading-relaxed pr-8">
+                            <MarkdownContent className="text-sm font-semibold text-duo-text leading-relaxed pr-8">
                               {analyses[index]}
-                            </p>
+                            </MarkdownContent>
                             <button
                               onClick={() => handlePlayAudio(analyses[index], `analysis-${index}`)}
                               disabled={!!audioLoadingId || !!playingAudioId}

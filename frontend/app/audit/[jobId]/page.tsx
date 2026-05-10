@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
 import { FoxMascot } from "@/components/fox-mascot"
+import { MarkdownContent } from "@/components/markdown-content"
 import { pollJob } from "@/lib/api"
 import { 
   ArrowLeft, 
@@ -174,9 +175,9 @@ export default function AuditPage() {
                   <AlertTriangle className="w-5 h-5 text-duo-orange flex-shrink-0 mt-0.5" />
                   <div className="flex-1">
                     <h3 className="font-bold text-duo-text mb-1">{topPriority.title}</h3>
-                    <p className="text-duo-text-muted text-sm font-semibold">
+                    <MarkdownContent className="text-duo-text-muted text-sm font-semibold">
                       {topPriority.description}
-                    </p>
+                    </MarkdownContent>
                   </div>
                 </div>
               </div>
@@ -203,16 +204,16 @@ export default function AuditPage() {
                 
                 <ProgressBar score={dim.score} color={meta.hex} />
                 
-                <p className="text-duo-text-muted text-sm font-semibold mt-4 mb-3">
+                <MarkdownContent className="text-duo-text-muted text-sm font-semibold mt-4 mb-3">
                   {dim.feedback}
-                </p>
+                </MarkdownContent>
                 
                 {dim.suggestions && dim.suggestions.length > 0 && (
                   <div className="space-y-2">
                     {dim.suggestions.map((suggestion: string, idx: number) => (
                       <div key={idx} className="flex items-start gap-2 text-sm">
                         <Lightbulb className="w-4 h-4 text-duo-yellow flex-shrink-0 mt-0.5" />
-                        <span className="text-duo-text font-semibold">{suggestion}</span>
+                        <MarkdownContent className="text-duo-text font-semibold">{suggestion}</MarkdownContent>
                       </div>
                     ))}
                   </div>
@@ -251,9 +252,9 @@ export default function AuditPage() {
                     <Play className="w-4 h-4 fill-current" />
                     {formatTime(item.timestamp)}
                   </a>
-                  <span className="text-duo-text font-bold text-lg flex-1">
+                  <MarkdownContent className="text-duo-text font-bold text-lg flex-1">
                     {item.note}
-                  </span>
+                  </MarkdownContent>
                 </div>
               ))}
             </div>
