@@ -1,0 +1,170 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1125" viewBox="0 0 1800 1125">
+  <defs>
+    <style>
+      .bg { fill: #f7f7f7; }
+      .card { fill: #ffffff; stroke: #d8dee8; stroke-width: 2; }
+      .soft { fill: #fbfcff; stroke: #d8dee8; stroke-width: 2; }
+      .title { font-family: Inter, Arial, sans-serif; font-size: 44px; font-weight: 900; fill: #253044; }
+      .subtitle { font-family: Inter, Arial, sans-serif; font-size: 20px; font-weight: 700; fill: #667085; }
+      .section { font-family: Inter, Arial, sans-serif; font-size: 18px; font-weight: 900; fill: #667085; letter-spacing: 1.2px; }
+      .h2 { font-family: Inter, Arial, sans-serif; font-size: 26px; font-weight: 900; fill: #253044; }
+      .h3 { font-family: Inter, Arial, sans-serif; font-size: 18px; font-weight: 900; fill: #253044; }
+      .body { font-family: Inter, Arial, sans-serif; font-size: 15px; font-weight: 700; fill: #475467; }
+      .small { font-family: Inter, Arial, sans-serif; font-size: 13px; font-weight: 700; fill: #667085; }
+      .pill { font-family: Inter, Arial, sans-serif; font-size: 13px; font-weight: 900; fill: #ffffff; }
+      .arrow { fill: none; stroke: #344054; stroke-width: 4; marker-end: url(#arrow); }
+      .thin { fill: none; stroke: #98a2b3; stroke-width: 3; marker-end: url(#arrow-soft); }
+      .green { stroke: #58cc02; }
+      .blue { stroke: #1cb0f6; }
+      .orange { stroke: #ff9600; }
+      .purple { stroke: #ce82ff; }
+      .red { stroke: #ff4b4b; }
+      .yellow { stroke: #ffc800; }
+      .shadow { filter: drop-shadow(0 10px 22px rgba(16, 24, 40, 0.10)); }
+    </style>
+    <marker id="arrow" markerWidth="14" markerHeight="14" refX="12" refY="7" orient="auto">
+      <path d="M2,2 L12,7 L2,12 Z" fill="#344054" />
+    </marker>
+    <marker id="arrow-soft" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#98a2b3" />
+    </marker>
+  </defs>
+
+  <rect class="bg" width="1800" height="1125" />
+
+  <text class="title" x="78" y="78">LectureAI Architecture</text>
+  <text class="subtitle" x="80" y="112">A single web app that turns YouTube lectures into student study tools, faculty coaching, and provost curriculum maps.</text>
+
+  <text class="section" x="96" y="178">1. INPUTS</text>
+  <text class="section" x="438" y="178">2. WEB APP</text>
+  <text class="section" x="782" y="178">3. ORCHESTRATION</text>
+  <text class="section" x="1128" y="178">4. AGENTS</text>
+  <text class="section" x="1510" y="178">5. SERVICES</text>
+
+  <rect class="card shadow" x="70" y="205" width="260" height="680" rx="28" />
+  <text class="h2" x="104" y="248">Three Modes</text>
+
+  <rect class="card green" x="104" y="282" width="192" height="112" rx="20" />
+  <text class="h3" x="128" y="316">Student</text>
+  <text class="small" x="128" y="346">1 lecture URL</text>
+  <text class="small" x="128" y="370">Study environment</text>
+
+  <rect class="card purple" x="104" y="432" width="192" height="112" rx="20" />
+  <text class="h3" x="128" y="466">Faculty</text>
+  <text class="small" x="128" y="496">1 lecture URL</text>
+  <text class="small" x="128" y="520">Private audit</text>
+
+  <rect class="card orange" x="104" y="582" width="192" height="140" rx="20" />
+  <text class="h3" x="128" y="616">Provost</text>
+  <text class="small" x="128" y="646">Course objectives</text>
+  <text class="small" x="128" y="670">2-10 lecture URLs</text>
+  <text class="small" x="128" y="694">Curriculum map</text>
+
+  <rect class="soft" x="104" y="760" width="192" height="82" rx="18" />
+  <text class="h3" x="128" y="792">Evidence</text>
+  <text class="small" x="128" y="820">Every result links</text>
+  <text class="small" x="128" y="838">back to timestamp</text>
+
+  <rect class="card shadow" x="405" y="305" width="260" height="300" rx="28" />
+  <text class="h2" x="438" y="350">Next.js Frontend</text>
+  <text class="body" x="438" y="386">Single public URL</text>
+  <text class="body" x="438" y="418">Mode-specific forms</text>
+  <text class="body" x="438" y="450">Processing screen</text>
+  <text class="body" x="438" y="482">Student dashboard</text>
+  <text class="body" x="438" y="514">Faculty report</text>
+  <text class="body" x="438" y="546">Provost map</text>
+
+  <rect x="438" y="560" width="172" height="38" rx="19" fill="#58cc02" />
+  <text class="pill" x="470" y="584">Vercel deploy</text>
+
+  <rect class="card shadow" x="740" y="305" width="270" height="300" rx="28" />
+  <text class="h2" x="774" y="350">Express Backend</text>
+  <text class="body" x="774" y="386">Creates async jobs</text>
+  <text class="body" x="774" y="418">Runs agent pipeline</text>
+  <text class="body" x="774" y="450">Stores progress/result</text>
+  <text class="body" x="774" y="482">Frontend polls status</text>
+  <text class="body" x="774" y="514">Handles partial failures</text>
+
+  <rect x="774" y="560" width="176" height="38" rx="19" fill="#1cb0f6" />
+  <text class="pill" x="810" y="584">Railway/API host</text>
+
+  <rect class="soft shadow" x="1080" y="220" width="330" height="610" rx="28" />
+  <text class="h2" x="1116" y="266">Agent Pipeline</text>
+
+  <rect class="card orange" x="1118" y="306" width="252" height="70" rx="18" />
+  <text class="h3" x="1140" y="334">1. Ingestion Agent</text>
+  <text class="small" x="1140" y="358">YouTube URL → transcript + metadata</text>
+
+  <rect class="card blue" x="1118" y="406" width="252" height="70" rx="18" />
+  <text class="h3" x="1140" y="434">2. Intelligence Agent</text>
+  <text class="small" x="1140" y="458">Transcript → topics, chunks, signals</text>
+
+  <rect class="card green" x="1118" y="506" width="116" height="86" rx="18" />
+  <text class="h3" x="1140" y="536">Student</text>
+  <text class="small" x="1140" y="560">materials</text>
+
+  <rect class="card purple" x="1254" y="506" width="116" height="86" rx="18" />
+  <text class="h3" x="1276" y="536">Faculty</text>
+  <text class="small" x="1276" y="560">coaching</text>
+
+  <rect class="card yellow" x="1118" y="622" width="116" height="86" rx="18" />
+  <text class="h3" x="1140" y="652">Quiz</text>
+  <text class="small" x="1140" y="676">questions</text>
+
+  <rect class="card red" x="1254" y="622" width="116" height="86" rx="18" />
+  <text class="h3" x="1276" y="652">Search</text>
+  <text class="small" x="1276" y="676">source moments</text>
+
+  <rect class="card orange" x="1118" y="738" width="252" height="70" rx="18" />
+  <text class="h3" x="1140" y="766">Provost Agent</text>
+  <text class="small" x="1140" y="790">Objectives ↔ lecture coverage</text>
+
+  <rect class="card shadow" x="1485" y="232" width="245" height="585" rx="28" />
+  <text class="h2" x="1520" y="278">Services</text>
+
+  <rect class="soft" x="1520" y="316" width="174" height="62" rx="16" />
+  <text class="h3" x="1542" y="344">YouTube</text>
+  <text class="small" x="1542" y="365">metadata + video</text>
+
+  <rect class="soft" x="1520" y="410" width="174" height="62" rx="16" />
+  <text class="h3" x="1542" y="438">Captions</text>
+  <text class="small" x="1542" y="459">RapidAPI + fallback</text>
+
+  <rect class="soft" x="1520" y="504" width="174" height="62" rx="16" />
+  <text class="h3" x="1542" y="532">Gemini</text>
+  <text class="small" x="1542" y="553">generation + embeddings</text>
+
+  <rect class="soft" x="1520" y="598" width="174" height="62" rx="16" />
+  <text class="h3" x="1542" y="626">Pinecone</text>
+  <text class="small" x="1542" y="647">semantic search index</text>
+
+  <rect class="soft" x="1520" y="692" width="174" height="62" rx="16" />
+  <text class="h3" x="1542" y="720">ElevenLabs</text>
+  <text class="small" x="1542" y="741">voice narration</text>
+
+  <rect class="soft" x="1520" y="786" width="174" height="62" rx="16" />
+  <text class="h3" x="1542" y="814">Redis</text>
+  <text class="small" x="1542" y="835">job status + results</text>
+
+  <path class="arrow" d="M330 545 L405 455" />
+  <path class="arrow" d="M665 455 L740 455" />
+  <path class="arrow" d="M1010 455 L1080 455" />
+  <path class="arrow" d="M1244 376 L1244 406" />
+  <path class="arrow" d="M1244 476 L1176 506" />
+  <path class="arrow" d="M1244 476 L1312 506" />
+  <path class="arrow" d="M1244 476 L1176 622" />
+  <path class="arrow" d="M1244 476 L1312 622" />
+  <path class="arrow" d="M1244 708 L1244 738" />
+
+  <path class="thin" d="M1370 340 L1520 347" />
+  <path class="thin" d="M1370 340 L1520 441" />
+  <path class="thin" d="M1370 441 L1520 535" />
+  <path class="thin" d="M1312 665 L1520 629" />
+  <path class="thin" d="M862 605 L1520 817" />
+  <path class="thin" d="M1176 592 L1520 723" />
+
+  <rect class="card shadow" x="220" y="930" width="1360" height="125" rx="28" />
+  <text class="h2" x="260" y="972">How to explain it</text>
+  <text class="body" x="260" y="1008">Users choose Student, Faculty, or Provost. The Next.js app sends the request to an Express orchestrator, which runs specialized agents over transcripts.</text>
+  <text class="body" x="260" y="1036">Outputs are grounded in timestamped lecture evidence, with Redis tracking jobs and Pinecone powering semantic search.</text>
+</svg>
