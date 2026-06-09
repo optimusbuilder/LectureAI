@@ -4,6 +4,8 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+const GEMINI_FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL || 'gemini-2.5-flash-lite';
 const GEMINI_EMBEDDING_MODEL = process.env.GEMINI_EMBEDDING_MODEL || 'gemini-embedding-001';
 const GEMINI_EMBEDDING_DIMENSIONS = 768;
 
@@ -20,6 +22,12 @@ const isRetryable = (error) => {
   if (msg.includes('429') || msg.includes('503') || msg.includes('RESOURCE_EXHAUSTED')) return true;
   if (msg.includes('overloaded') || msg.includes('unavailable') || msg.includes('ECONNRESET')) return true;
   return false;
+};
+
+const isModelUnavailable = (error) => {
+  const msg = error?.message || '';
+  const status = error?.status || error?.httpStatus;
+  return status === 404 || msg.includes('404') || msg.includes('no longer available');
 };
 
 const extractJsonCandidate = (text) => {
@@ -60,9 +68,9 @@ const formatParseDiagnostics = (text, response, parseError) => ({
 /**
  * Core Gemini call (single attempt, no retry)
  */
-const callGemini = async (systemPrompt, userPrompt, isJson) => {
+const callGemini = async (systemPrompt, userPrompt, isJson, modelName = GEMINI_MODEL) => {
   const config = {
-    model: "gemini-2.0-flash",
+    model: modelName,
     systemInstruction: systemPrompt,
     generationConfig: {
       maxOutputTokens: 8192,
@@ -115,16 +123,25 @@ ${text}
 };
 
 /**
- * High-level wrapper for Gemini 2.0 Flash with retry + exponential backoff
+ * High-level wrapper for Gemini with retry, fallback model, and exponential backoff
  */
 export const getGeminiResponse = async (systemPrompt, userPrompt, isJson = true) => {
   let lastError;
+  let modelName = GEMINI_MODEL;
+  let triedFallback = false;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      return await callGemini(systemPrompt, userPrompt, isJson);
+      return await callGemini(systemPrompt, userPrompt, isJson, modelName);
     } catch (error) {
       lastError = error;
+
+      if (!triedFallback && isModelUnavailable(error) && modelName !== GEMINI_FALLBACK_MODEL) {
+        console.warn(`Gemini model ${modelName} unavailable, falling back to ${GEMINI_FALLBACK_MODEL}`);
+        modelName = GEMINI_FALLBACK_MODEL;
+        triedFallback = true;
+        continue;
+      }
 
       if (attempt < MAX_RETRIES && isRetryable(error)) {
         const backoff = INITIAL_BACKOFF_MS * Math.pow(2, attempt);

@@ -39,7 +39,7 @@ graph TD
     FE -->|POST /regenerate| BE
 
     BE -->|Agent 1| YT[RapidAPI Captions]
-    BE -->|Agent 2, 3, 5| GM[Google Gemini 2.0 Flash]
+    BE -->|Agent 2, 3, 5| GM[Google Gemini 2.5 Flash]
     BE -->|Agent 4 - Embed| EMB[Gemini Embeddings<br/>gemini-embedding-001]
     BE -->|Upsert & Query| PC[Pinecone<br/>Serverless · 768d]
     BE -->|Voice Synthesis| EL[ElevenLabs TTS API]
@@ -66,7 +66,7 @@ graph TD
 |-------|-----------|---------|
 | Frontend | Next.js 16 (App Router) | Duolingo-inspired UI with Fox mascot |
 | Backend | Express.js | Multi-agent orchestration & API |
-| LLM | Google Gemini 2.0 Flash | Content analysis & material generation |
+| LLM | Google Gemini 2.5 Flash | Content analysis & material generation |
 | Embeddings | Gemini Embeddings API (`gemini-embedding-001`) | 768-dim vectors for semantic search |
 | Vector DB | Pinecone (Serverless) | Namespace-isolated lecture indexing |
 | TTS | ElevenLabs | Fox mascot voice narration |
