@@ -3,7 +3,7 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const JOB_TTL_SECONDS = 60 * 60 * 2; // 2 hours
+const JOB_TTL_SECONDS = 60 * 60 * 24 * 30; // 30 days
 
 let redis = null;
 if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {

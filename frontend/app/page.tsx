@@ -1,7 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { FoxMascot } from "@/components/fox-mascot"
 import { startJob, startProvostJob } from "@/lib/api"
 import { FileText, Search, Layers, GraduationCap, Users, Sparkles, Building2, Plus, X } from "lucide-react"
@@ -17,6 +18,24 @@ export default function LandingPage() {
   const [courseUrls, setCourseUrls] = useState(["", ""])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [history, setHistory] = useState<any[]>([])
+
+  useEffect(() => {
+    try {
+      const existing = localStorage.getItem("lectureai_history")
+      if (existing) {
+        setHistory(JSON.parse(existing))
+      }
+    } catch (e) {
+      console.error("Failed to load history", e)
+    }
+  }, [])
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = Math.floor(seconds % 60)
+    return `${mins}:${secs.toString().padStart(2, "0")}`
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -275,8 +294,66 @@ export default function LandingPage() {
                 <p className="text-red-600 font-semibold text-sm">{error}</p>
               </div>
             )}
-          </form>
-        </div>
+           </form>
+
+           {/* Recent Lectures History */}
+           {history.length > 0 && (
+             <div className="mt-12 text-left w-full border-t-2 border-duo-border pt-8 max-w-2xl">
+               <div className="flex items-center justify-between mb-4">
+                 <h3 className="text-xs font-black uppercase tracking-wider text-duo-text-muted">
+                   Recent Lectures
+                 </h3>
+                 <button
+                   type="button"
+                   onClick={() => {
+                     localStorage.removeItem("lectureai_history")
+                     setHistory([])
+                   }}
+                   className="text-xs font-bold text-duo-red hover:underline"
+                 >
+                   Clear All
+                 </button>
+               </div>
+               <div className="space-y-3">
+                 {history.map((item) => (
+                   <div 
+                     key={item.jobId}
+                     className="card-duo p-4 flex items-center justify-between hover:border-duo-green transition-colors group"
+                   >
+                     <Link 
+                       href={`/dashboard/${item.jobId}`}
+                       className="flex-1 flex items-center gap-3 min-w-0"
+                     >
+                       <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-duo-surface flex items-center justify-center border-2 border-duo-border">
+                         <GraduationCap className="w-5 h-5 text-duo-green" />
+                       </div>
+                       <div className="min-w-0">
+                         <h4 className="font-bold text-duo-text text-sm truncate pr-4">
+                           {item.title}
+                         </h4>
+                         <p className="text-duo-text-muted text-xs font-semibold">
+                           {item.author} • {formatTime(item.duration)}
+                         </p>
+                       </div>
+                     </Link>
+                     <button
+                       type="button"
+                       onClick={() => {
+                         const updated = history.filter((x) => x.jobId !== item.jobId)
+                         localStorage.setItem("lectureai_history", JSON.stringify(updated))
+                         setHistory(updated)
+                       }}
+                       className="text-duo-text-muted hover:text-duo-red p-1.5 rounded-lg border-2 border-transparent hover:border-duo-border hover:bg-white active:bg-duo-surface transition-all"
+                       aria-label="Remove from history"
+                     >
+                       <X className="w-4 h-4" />
+                     </button>
+                   </div>
+                 ))}
+               </div>
+             </div>
+           )}
+         </div>
       </main>
 
       {/* Features Section */}

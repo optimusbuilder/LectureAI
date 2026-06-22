@@ -83,12 +83,34 @@ export default function DashboardPage() {
   // Fetch data from backend
   useEffect(() => {
     if (!jobId) return
+
+    const saveToHistory = (id: string, videoMeta: any) => {
+      try {
+        const existing = localStorage.getItem("lectureai_history")
+        const historyList = existing ? JSON.parse(existing) : []
+        const filtered = historyList.filter((item: any) => item.jobId !== id)
+        const newItem = {
+          jobId: id,
+          title: videoMeta?.title || "Untitled Lecture",
+          author: videoMeta?.author || "Unknown Author",
+          duration: videoMeta?.duration || 0,
+          videoId: videoMeta?.videoId,
+          savedAt: Date.now()
+        }
+        const updated = [newItem, ...filtered].slice(0, 10)
+        localStorage.setItem("lectureai_history", JSON.stringify(updated))
+      } catch (e) {
+        console.error("Failed to save history", e)
+      }
+    }
+
     const fetchData = async () => {
       try {
         const job = await pollJob(jobId)
         if (job.status === "complete") {
           setData(job)
           setLanguage(job.result.language || "en")
+          saveToHistory(jobId, job.videoMeta)
         } else if (job.status === "error") {
           setError(job.message || "Failed to load study materials")
         }
