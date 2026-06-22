@@ -8,9 +8,9 @@ import { provostAgent } from '../agents/provostAgent.js';
 const router = express.Router();
 
 const provostLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,
-  max: 8,
-  message: { error: 'Too many curriculum map requests, please try again later.' }
+  windowMs: 24 * 60 * 60 * 1000, // 24 hours
+  max: 1,                        // 1 request per 24 hours max
+  message: { error: 'Daily limit reached. You can only map 1 curriculum per day.' }
 });
 
 const normalizeObjectives = (value) => {

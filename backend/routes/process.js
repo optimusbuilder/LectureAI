@@ -5,9 +5,9 @@ import { generateJobId, createJob, updateJob } from '../lib/jobStore.js';
 const router = express.Router();
 
 const processLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 20,                   // 20 requests per hour max
-  message: { error: 'Too many requests, please try again later.' }
+  windowMs: 24 * 60 * 60 * 1000, // 24 hours
+  max: 2,                        // 2 requests per 24 hours max
+  message: { error: 'Daily limit reached. You can only analyze 2 videos per day.' }
 });
 
 router.post('/', processLimiter, async (req, res) => {
