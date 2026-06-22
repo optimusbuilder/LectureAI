@@ -26,7 +26,9 @@ import {
   ClipboardCheck,
   CheckCircle2,
   XCircle,
-  Trophy
+  Trophy,
+  Menu,
+  X
 } from "lucide-react"
 
 type Tab = "summary" | "flashcards" | "quiz" | "search" | "explore"
@@ -59,6 +61,7 @@ export default function DashboardPage() {
 
   // UI state
   const [activeTab, setActiveTab] = useState<Tab>("summary")
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [summaryDepth, setSummaryDepth] = useState<SummaryDepth>("medium")
   const [currentCard, setCurrentCard] = useState(0)
   const [isFlipped, setIsFlipped] = useState(false)
@@ -271,19 +274,40 @@ export default function DashboardPage() {
   const { outline, summaries, flashcards } = result
 
   return (
-    <div className="min-h-screen bg-white flex">
+    <div className="min-h-screen bg-white flex flex-col lg:flex-row relative overflow-x-hidden">
+      {/* Sidebar Overlay for mobile */}
+      {isSidebarOpen && (
+        <div
+          className="lg:hidden fixed inset-0 bg-black/40 z-40 transition-opacity"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="w-80 bg-duo-surface border-r border-duo-border flex flex-col">
+      <aside className={`
+        fixed inset-y-0 left-0 w-80 bg-duo-surface border-r border-duo-border flex flex-col z-50 transition-transform duration-300 ease-in-out
+        lg:relative lg:transform-none lg:z-auto
+        ${isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
+      `}>
         {/* Sidebar Header */}
-        <div className="p-4 border-b border-duo-border">
-          <Link href="/" className="flex items-center gap-2 mb-4">
-            <ArrowLeft className="w-4 h-4 text-duo-text-muted" />
-            <span className="text-sm font-semibold text-duo-text-muted">Back</span>
-          </Link>
-          <div className="flex items-center gap-2">
-            <FoxMascot size="sm" expression="studying" animate={false} />
-            <span className="text-duo-green font-extrabold text-lg">LectureAI</span>
+        <div className="p-4 border-b border-duo-border flex items-center justify-between">
+          <div className="flex flex-col gap-3 w-full">
+            <Link href="/" className="flex items-center gap-2">
+              <ArrowLeft className="w-4 h-4 text-duo-text-muted" />
+              <span className="text-sm font-semibold text-duo-text-muted">Back</span>
+            </Link>
+            <div className="flex items-center gap-2">
+              <FoxMascot size="sm" expression="studying" animate={false} />
+              <span className="text-duo-green font-extrabold text-lg">LectureAI</span>
+            </div>
           </div>
+          <button
+            onClick={() => setIsSidebarOpen(false)}
+            className="lg:hidden p-2 rounded-xl border-2 border-duo-border text-duo-text-muted hover:bg-white active:bg-duo-surface"
+            aria-label="Close sidebar"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
         {/* Video Info */}
@@ -355,7 +379,23 @@ export default function DashboardPage() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col">
+      <main className="flex-1 flex flex-col min-w-0">
+        {/* Mobile Header */}
+        <header className="lg:hidden flex items-center justify-between px-4 py-3 border-b border-duo-border bg-white sticky top-0 z-30">
+          <button
+            onClick={() => setIsSidebarOpen(true)}
+            className="p-2 rounded-xl border-2 border-duo-border hover:bg-duo-surface text-duo-text-muted transition-colors"
+            aria-label="Open sidebar"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          <div className="flex items-center gap-1.5">
+            <FoxMascot size="sm" expression="happy" animate={false} />
+            <span className="text-duo-green font-extrabold text-base">LectureAI</span>
+          </div>
+          <div className="w-9" /> {/* Spacer */}
+        </header>
+
         {/* Regenerating Banner */}
         {isRegenerating && (
           <div className="bg-duo-green/5 border-b border-duo-green/20 px-6 py-3 flex items-center gap-3">
@@ -365,8 +405,8 @@ export default function DashboardPage() {
         )}
 
         {/* Tab Bar */}
-        <div className="p-4 border-b border-duo-border">
-          <div className="flex gap-2">
+        <div className="p-4 border-b border-duo-border overflow-x-auto custom-scrollbar">
+          <div className="flex gap-2 min-w-max">
             <button
               onClick={() => setActiveTab("summary")}
               className={`flex items-center gap-2 px-5 py-2 rounded-full font-bold text-sm transition-all ${
@@ -430,8 +470,8 @@ export default function DashboardPage() {
           {/* Summary Tab */}
           {activeTab === "summary" && (
             <div className="max-w-4xl mx-auto">
-              <div className="flex items-center gap-4 mb-8">
-                <div className="flex gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-8">
+                <div className="flex gap-3 overflow-x-auto min-w-max pb-1">
                   {(["short", "medium", "full"] as const).map((depth) => (
                     <button
                       key={depth}
@@ -451,7 +491,7 @@ export default function DashboardPage() {
                   <button
                     onClick={() => handlePlayAudio(summaries.short, "summary-short")}
                     disabled={!!audioLoadingId || !!playingAudioId}
-                    className="flex items-center gap-2 px-6 py-3 rounded-full bg-duo-blue text-white font-extrabold text-sm uppercase tracking-wider border-b-4 border-duo-blue-dark disabled:opacity-50 transition-all hover:-translate-y-0.5 active:translate-y-0"
+                    className="flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-duo-blue text-white font-extrabold text-sm uppercase tracking-wider border-b-4 border-duo-blue-dark disabled:opacity-50 transition-all hover:-translate-y-0.5 active:translate-y-0 w-full sm:w-auto"
                   >
                     {audioLoadingId === "summary-short" ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -476,55 +516,55 @@ export default function DashboardPage() {
           {/* Flashcards Tab */}
           {activeTab === "flashcards" && flashcards && flashcards.length > 0 && (
             <div className="max-w-4xl mx-auto py-4">
-              <div className="flex items-center justify-center gap-3 mb-8">
-                <div className="w-12 h-12 rounded-full bg-duo-green flex items-center justify-center border-b-4 border-duo-green-dark shadow-sm">
-                  <span className="text-white text-xl font-black">{currentCard + 1}</span>
+              <div className="flex items-center justify-center gap-3 mb-6 sm:mb-8">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-duo-green flex items-center justify-center border-b-4 border-duo-green-dark shadow-sm">
+                  <span className="text-white text-lg sm:text-xl font-black">{currentCard + 1}</span>
                 </div>
-                <span className="text-duo-text-muted font-black text-lg">
+                <span className="text-duo-text-muted font-black text-base sm:text-lg">
                   of {flashcards.length} Mastery Cards
                 </span>
               </div>
 
               <div 
-                className="flashcard-container mb-12 cursor-pointer h-[480px]"
+                className="flashcard-container mb-8 sm:mb-12 cursor-pointer h-[360px] sm:h-[420px] md:h-[480px]"
                 onClick={() => setIsFlipped(!isFlipped)}
               >
                 <div className={`flashcard relative h-full ${isFlipped ? "flipped" : ""}`}>
                   {/* Front */}
-                  <div className={`flashcard-face absolute inset-0 card-duo p-12 border-b-8 border-${cardColors[currentCard % cardColors.length]} flex flex-col shadow-xl`}>
-                    <span className={`self-start px-4 py-2 rounded-2xl bg-${cardColors[currentCard % cardColors.length]}/10 text-${cardColors[currentCard % cardColors.length]} text-sm font-black uppercase tracking-widest mb-4 flex-shrink-0`}>
+                  <div className={`flashcard-face absolute inset-0 card-duo p-6 sm:p-12 border-b-8 border-${cardColors[currentCard % cardColors.length]} flex flex-col shadow-xl`}>
+                    <span className={`self-start px-3 py-1.5 rounded-2xl bg-${cardColors[currentCard % cardColors.length]}/10 text-${cardColors[currentCard % cardColors.length]} text-xs sm:text-sm font-black uppercase tracking-widest mb-2 sm:mb-4 flex-shrink-0`}>
                       Critical Question
                     </span>
                     <div className="flex-1 flex items-center justify-center overflow-y-auto custom-scrollbar pr-2">
-                      <MarkdownContent className="text-center text-2xl md:text-3xl lg:text-4xl font-black leading-tight">
+                      <MarkdownContent className="text-center text-xl sm:text-2xl md:text-3xl lg:text-4xl font-black leading-tight">
                         {flashcards[currentCard].front}
                       </MarkdownContent>
                     </div>
-                    <div className="flex items-center justify-center gap-2 text-duo-text-muted font-bold mt-4 flex-shrink-0">
+                    <div className="flex items-center justify-center gap-2 text-duo-text-muted font-bold mt-2 sm:mt-4 flex-shrink-0 text-sm">
                       <span className="animate-bounce">👇</span>
                       <span>Tap to reveal the answer</span>
                     </div>
                   </div>
 
                   {/* Back */}
-                  <div className="flashcard-face flashcard-back absolute inset-0 card-duo p-12 border-b-8 border-duo-green flex flex-col shadow-xl">
-                    <span className="self-start px-4 py-2 rounded-2xl bg-duo-green/10 text-duo-green text-sm font-black uppercase tracking-widest mb-8">
+                  <div className="flashcard-face flashcard-back absolute inset-0 card-duo p-6 sm:p-12 border-b-8 border-duo-green flex flex-col shadow-xl">
+                    <span className="self-start px-3 py-1.5 rounded-2xl bg-duo-green/10 text-duo-green text-xs sm:text-sm font-black uppercase tracking-widest mb-4 sm:mb-8 flex-shrink-0">
                       Expert Answer
                     </span>
-                    <div className="flex-1 flex items-center justify-center">
-                      <MarkdownContent className="text-center text-2xl md:text-3xl font-bold leading-relaxed">
+                    <div className="flex-1 flex items-center justify-center overflow-y-auto custom-scrollbar pr-2">
+                      <MarkdownContent className="text-center text-xl sm:text-2xl md:text-3xl font-bold leading-relaxed">
                         {flashcards[currentCard].back}
                       </MarkdownContent>
                     </div>
-                    <div className="flex flex-col items-center gap-4 mt-8">
+                    <div className="flex flex-col items-center gap-4 mt-4 sm:mt-8 flex-shrink-0">
                       <a
                         href={flashcards[currentCard].youtubeLink}
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={(e) => e.stopPropagation()}
-                        className="flex items-center gap-3 bg-duo-blue text-white px-8 py-3 rounded-full font-black text-sm uppercase tracking-widest border-b-4 border-duo-blue-dark hover:-translate-y-0.5 active:translate-y-0 transition-all"
+                        className="flex items-center gap-2 bg-duo-blue text-white px-6 py-2.5 sm:px-8 sm:py-3 rounded-full font-black text-xs sm:text-sm uppercase tracking-widest border-b-4 border-duo-blue-dark hover:-translate-y-0.5 active:translate-y-0 transition-all text-center"
                       >
-                        <Play className="w-5 h-5 fill-current" />
+                        <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-current" />
                         Watch Proof at {formatTime(flashcards[currentCard].timestamp)}
                       </a>
                     </div>
@@ -532,16 +572,32 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-center gap-8">
-                <button 
-                  onClick={prevCard} 
-                  className="btn-3d-secondary flex items-center gap-3 px-8 py-4 text-lg"
-                >
-                  <ChevronLeft className="w-6 h-6" />
-                  Previous
-                </button>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
+                <div className="flex items-center justify-between w-full sm:w-auto gap-4">
+                  <button 
+                    onClick={prevCard} 
+                    className="btn-3d-secondary flex items-center gap-2 px-5 py-3 text-base flex-1 sm:flex-none"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                    Previous
+                  </button>
 
-                <div className="flex gap-3">
+                  <div className="flex gap-2 sm:hidden">
+                    <span className="text-sm font-black text-duo-text-muted">
+                      {currentCard + 1} / {flashcards.length}
+                    </span>
+                  </div>
+
+                  <button 
+                    onClick={nextCard} 
+                    className="btn-3d-primary flex items-center gap-2 px-5 py-3 text-base flex-1 sm:flex-none"
+                  >
+                    Next Card
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="hidden sm:flex gap-3">
                   {flashcards.map((_: any, index: number) => (
                     <button
                       key={index}
@@ -554,17 +610,9 @@ export default function DashboardPage() {
                     />
                   ))}
                 </div>
-
-                <button 
-                  onClick={nextCard} 
-                  className="btn-3d-primary flex items-center gap-3 px-10 py-4 text-lg"
-                >
-                  Next Card
-                  <ChevronRight className="w-6 h-6" />
-                </button>
               </div>
 
-              <div className="flex items-center justify-center gap-4 mt-12 text-duo-text-muted font-bold bg-duo-surface p-4 rounded-2xl">
+              <div className="hidden md:flex items-center justify-center gap-4 mt-12 text-duo-text-muted font-bold bg-duo-surface p-4 rounded-2xl">
                 <div className="flex gap-2">
                   <kbd className="px-3 py-1 bg-white border-2 border-duo-border rounded-lg text-sm shadow-sm">←</kbd>
                   <kbd className="px-3 py-1 bg-white border-2 border-duo-border rounded-lg text-sm shadow-sm">→</kbd>
@@ -799,23 +847,23 @@ export default function DashboardPage() {
           {/* Search Tab */}
           {activeTab === "search" && (
             <div className="max-w-4xl mx-auto">
-              <form onSubmit={handleSearch} className="flex gap-4 mb-12">
+              <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-3 mb-8">
                 <div className="relative flex-1">
-                  <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-6 h-6 text-duo-text-muted" />
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-duo-text-muted" />
                   <input
                     type="text"
-                    placeholder="Search for any concept, fact, or question from the lecture..."
+                    placeholder="Search for any concept, fact, or question..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="input-duo pl-14 py-4 text-lg"
+                    className="input-duo pl-12 py-3.5 text-base"
                   />
                 </div>
                 <button 
                   type="submit" 
                   disabled={isSearching || searchQuery.trim().length < 2}
-                  className="btn-3d-primary px-10 py-4 text-base disabled:opacity-50"
+                  className="btn-3d-primary px-6 py-3.5 text-base disabled:opacity-50 w-full sm:w-auto"
                 >
-                  {isSearching ? <Loader2 className="w-5 h-5 animate-spin" /> : "Search Lecture"}
+                  {isSearching ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "Search"}
                 </button>
               </form>
 
@@ -849,7 +897,7 @@ export default function DashboardPage() {
                             <button
                               onClick={() => handleAnalyzeChunk(index, result.text)}
                               disabled={analyzingIndex !== null}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-duo-purple text-white text-[10px] font-bold uppercase tracking-wider disabled:opacity-50"
+                              className="lg:opacity-0 lg:group-hover:opacity-100 transition-opacity flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-duo-purple text-white text-[10px] font-bold uppercase tracking-wider disabled:opacity-50"
                             >
                               {analyzingIndex === index ? (
                                 <Loader2 className="w-3 h-3 animate-spin" />

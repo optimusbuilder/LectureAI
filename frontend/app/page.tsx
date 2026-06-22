@@ -211,10 +211,10 @@ export default function LandingPage() {
             ) : (
               <input
                 type="url"
-                placeholder="Paste YouTube lecture URL here..."
+                placeholder="Paste YouTube lecture URL..."
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                className="input-duo h-14 text-center text-lg"
+                className="input-duo h-14 text-center text-base md:text-lg"
                 required
               />
             )}
