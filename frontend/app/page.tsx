@@ -77,24 +77,28 @@ export default function LandingPage() {
       title: "Student Mode",
       description: "Everything you need to master the material and ace your exams."
     },
+    /* Hiding Faculty Mode from public use
     {
       icon: Users,
       color: "bg-duo-yellow text-duo-text",
       title: "Faculty Mode",
       description: "Pedagogical audits with clarity, accessibility, and pacing insights."
     },
+    */
     {
       icon: Sparkles,
       color: "bg-duo-green",
       title: "AI-Powered",
       description: "Advanced AI analyzes lectures in under 60 seconds."
     },
+    /* Hiding Provost Mode from public use
     {
       icon: Building2,
       color: "bg-duo-purple",
       title: "Provost Mode",
       description: "Map course lectures against stated learning objectives."
     }
+    */
   ]
 
   return (
@@ -215,7 +219,8 @@ export default function LandingPage() {
               />
             )}
 
-            {/* Mode Toggle */}
+            {/* Mode Toggle hidden for public use, defaulting to student mode */}
+            {/*
             <div className="flex justify-center gap-3">
               <button
                 type="button"
@@ -254,6 +259,7 @@ export default function LandingPage() {
                 Provost
               </button>
             </div>
+            */}
 
             {/* Submit Button */}
             <button
